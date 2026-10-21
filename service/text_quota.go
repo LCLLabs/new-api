@@ -542,4 +542,5 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 		Other:            other,
 	})
 	relayInfo.PerformanceOutputTokens = int64(summary.CompletionTokens)
+	relayInfo.PerformanceInputTokens = int64(summary.PromptTokens)
 }

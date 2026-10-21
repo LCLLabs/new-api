@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -16,6 +17,7 @@ import (
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	pluginruntime "github.com/QuantumNous/new-api/pkg/jsplugin"
+	"github.com/QuantumNous/new-api/pkg/obsmetrics"
 	perfmetrics "github.com/QuantumNous/new-api/pkg/perf_metrics"
 	"github.com/QuantumNous/new-api/relay"
 	"github.com/QuantumNous/new-api/relay/channel/task/taskcommon"
@@ -159,6 +161,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		relayInfo.StreamStatus = nil
 		relayInfo.PerformanceBusinessRejection = false
 		relayInfo.PerformanceOutputTokens = 0
+		relayInfo.PerformanceInputTokens = 0
 		relayInfo.RetryIndex = retryParam.GetRetry()
 		channel, channelErr := getChannel(c, relayInfo, retryParam)
 		if channelErr != nil {
@@ -206,6 +209,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 		decision := service.DecideRelayRetry(c, newAPIError, common.RetryTimes-retryParam.GetRetry())
 		service.RecordPolicyFailure(c, channel.Id, newAPIError, decision)
+		obsmetrics.ObserveUpstreamFailure(channel.Id, newAPIError.StatusCode, upstreamAttemptTimedOut(relayInfo, newAPIError), relayInfo.PerformanceBusinessRejection || errors.Is(newAPIError, context.Canceled))
 		processChannelError(c, *types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey, common.GetContextKeyString(c, constant.ContextKeyChannelKey), channel.GetAutoBan()), newAPIError, relayInfo)
 
 		if decision.Action != "retry" {
@@ -295,6 +299,13 @@ func getChannel(c *gin.Context, info *relaycommon.RelayInfo, retryParam *service
 
 func processChannelError(c *gin.Context, channelError types.ChannelError, err *types.NewAPIError, relayInfo *relaycommon.RelayInfo) {
 	service.ProcessChannelError(c, channelError, err, relayInfo)
+}
+
+func upstreamAttemptTimedOut(info *relaycommon.RelayInfo, err *types.NewAPIError) bool {
+	if err != nil && (errors.Is(err, context.DeadlineExceeded) || err.GetErrorCode() == types.ErrorCodeChannelResponseTimeExceeded) {
+		return true
+	}
+	return info != nil && info.StreamStatus != nil && errors.Is(info.StreamStatus.EndError, context.DeadlineExceeded)
 }
 
 func RelayMidjourney(c *gin.Context) {
