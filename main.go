@@ -24,6 +24,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/oauth"
 	"github.com/QuantumNous/new-api/pkg/jsplugin"
+	"github.com/QuantumNous/new-api/pkg/obsmetrics"
 	perfmetrics "github.com/QuantumNous/new-api/pkg/perf_metrics"
 	"github.com/QuantumNous/new-api/pkg/wsmanager"
 	"github.com/QuantumNous/new-api/relay"
@@ -198,6 +199,10 @@ func main() {
 	server.Use(middleware.Version())
 	server.Use(middleware.I18n())
 	middleware.SetUpLogger(server)
+	if token := strings.TrimSpace(os.Getenv("METRICS_TOKEN")); token != "" {
+		obsmetrics.Enable()
+		server.GET("/metrics", obsmetrics.Handler(token))
+	}
 	InjectUmamiAnalytics()
 	InjectGoogleAnalytics()
 

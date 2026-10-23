@@ -11,6 +11,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/pkg/obsmetrics"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/setting/perf_metrics_setting"
@@ -35,6 +36,32 @@ func RecordRelayResult(ctx context.Context, info *relaycommon.RelayInfo, apiErr 
 		return
 	}
 	outcome := ClassifyRelayOutcome(ctx, info, apiErr)
+	// A finished non-stream response is already written before settlement.
+	// Clients often close the connection while that bookkeeping runs, which
+	// cancels the request context. That is not an abandoned generation.
+	ignored := outcome == OutcomeIgnored
+	if ignored && apiErr == nil && !info.IsStream && !info.PerformanceBusinessRejection && ctx != nil && ctx.Err() == context.Canceled {
+		ignored = false
+	}
+	observation := obsmetrics.RelayObservation{
+		Ignored:       ignored,
+		Stream:        info.IsStream,
+		HasFirstToken: info.HasSendResponse(),
+		ChannelID:     info.GetChannelID(),
+		OutputTokens:  info.PerformanceOutputTokens,
+		InputTokens:   info.PerformanceInputTokens,
+	}
+	if !info.StartTime.IsZero() {
+		observation.HasClock = true
+		observation.Duration = time.Since(info.StartTime)
+		if observation.HasFirstToken {
+			observation.FirstToken = info.FirstResponseTime.Sub(info.StartTime)
+		}
+	}
+	obsmetrics.ObserveRelay(observation)
+	if !ignored && apiErr == nil {
+		obsmetrics.ObserveUpstreamSuccess(info.GetChannelID())
+	}
 	if outcome == OutcomeIgnored {
 		return
 	}

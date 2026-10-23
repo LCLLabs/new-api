@@ -13,6 +13,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/logger"
+	"github.com/QuantumNous/new-api/pkg/obsmetrics"
 	kitdto "github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 )
@@ -103,6 +104,14 @@ func InitChannelCache() {
 	// invalidating the pricing cache, otherwise the reversed order deadlocks.
 	InvalidatePricingCache()
 	rebuildTaskAliasView()
+	names := make(map[int]string, len(newChannelId2channel))
+	for id, channel := range newChannelId2channel {
+		if channel == nil {
+			continue
+		}
+		names[id] = channel.Name
+	}
+	obsmetrics.SetChannelNames(names)
 	common.SysLog("channels synced from database")
 }
 

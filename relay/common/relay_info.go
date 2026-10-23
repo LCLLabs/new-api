@@ -210,6 +210,7 @@ type RelayInfo struct {
 	// PerformanceOutputTokens is captured by settlement and sampled once at
 	// the request boundary, independently of billing success or failure.
 	PerformanceOutputTokens      int64
+	PerformanceInputTokens       int64
 	PerformanceBusinessRejection bool
 
 	// convOptions caches the converter settings snapshot (see ConvOptions).

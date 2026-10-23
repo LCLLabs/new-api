@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/pkg/obsmetrics"
 	"github.com/gin-gonic/gin"
 )
 
@@ -19,6 +20,12 @@ func RouteTag(tag string) gin.HandlerFunc {
 
 func SetUpLogger(server *gin.Engine) {
 	server.Use(redactTaskArtifactAccessQuery())
+	server.Use(func(c *gin.Context) {
+		c.Next()
+		route, _ := c.Get(RouteTagKey)
+		routeName, _ := route.(string)
+		obsmetrics.ObserveHTTP(c.Writer.Status(), routeName)
+	})
 	server.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
 		var requestID string
 		if param.Keys != nil {
