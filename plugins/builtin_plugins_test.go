@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var expectedKeys = []string{"alibaba", "doubao", "google", "hailuo", "jimeng", "kling", "sora", "sunoapi", "vertex-ai", "vidu", "xai"}
+var expectedKeys = []string{"alibaba", "anyllm", "doubao", "google", "hailuo", "jimeng", "kling", "sora", "sunoapi", "vertex-ai", "vidu", "xai"}
 
 func TestBuiltInVendorPluginsDeclareNativeRoutesAndLegacyChannelTypes(t *testing.T) {
 	generation := jsplugin.DefaultRegistry.Generation()
@@ -252,6 +252,16 @@ func TestBuiltInPluginsAddressNewAPIUpstreamOnNativeRoutes(t *testing.T) {
 			vendorQuery:      "/v1/videos/tid",
 			gatewayQuery:     "/v1/videos/tid",
 			content:          "/v1/videos/tid/content",
+		},
+		{
+			key:              "anyllm",
+			driver:           map[string]any{"action": "text_to_video", "model": "doubao-seedance-2-0-260128", "upstreamModel": "doubao-seedance-2-0-260128", "requestBody": map[string]any{"prompt": "a cat"}},
+			vendorKey:        "vendor-key",
+			vendorAuthPrefix: "Bearer vendor-key",
+			vendorSubmit:     "/videos/generations",
+			gatewaySubmit:    "/videos/generations",
+			vendorQuery:      "/videos/tid/result",
+			gatewayQuery:     "/videos/tid/result",
 		},
 		{
 			key:              "xai",
