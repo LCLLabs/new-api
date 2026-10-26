@@ -203,6 +203,28 @@ func initConstantEnv() {
 	constant.GenerateDefaultToken = GetEnvOrDefaultBool("GENERATE_DEFAULT_TOKEN", false)
 	// 是否启用错误日志
 	constant.ErrorLogEnabled = GetEnvOrDefaultBool("ERROR_LOG_ENABLED", false)
+
+	PromptArchiveEnabled = GetEnvOrDefaultBool("PROMPT_ARCHIVE_ENABLED", false)
+	PromptArchiveDir = GetEnvOrDefaultString("PROMPT_ARCHIVE_DIR", "./prompt-archive")
+	PromptArchiveMaxRequestBytes = GetEnvOrDefault("PROMPT_ARCHIVE_MAX_REQUEST_BYTES", 1048576)
+	PromptArchiveMaxResponseBytes = GetEnvOrDefault("PROMPT_ARCHIVE_MAX_RESPONSE_BYTES", 1048576)
+	if PromptArchiveMaxRequestBytes <= 0 {
+		PromptArchiveMaxRequestBytes = 1048576
+	}
+	if PromptArchiveMaxResponseBytes <= 0 {
+		PromptArchiveMaxResponseBytes = 1048576
+	}
+	if PromptArchiveEnabled && PromptArchiveDir != "" {
+		absDir, err := filepath.Abs(PromptArchiveDir)
+		if err != nil {
+			SysError(LogText("PROMPT_ARCHIVE_DIR resolve failed: %s", err.Error()))
+		} else {
+			PromptArchiveDir = absDir
+			if err := os.MkdirAll(PromptArchiveDir, 0755); err != nil {
+				SysError(LogText("PROMPT_ARCHIVE_DIR create failed: %s", err.Error()))
+			}
+		}
+	}
 	// 任务轮询时查询的最大数量
 	constant.TaskQueryLimit = GetEnvOrDefault("TASK_QUERY_LIMIT", 1000)
 	// 异步任务超时时间（分钟），超过此时间未完成的任务将被标记为失败并退款。0 表示禁用。

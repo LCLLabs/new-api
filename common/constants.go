@@ -98,6 +98,12 @@ var MemoryCacheEnabled bool
 
 var LogConsumeEnabled = true
 
+// Prompt archive (local per-replica request/response capture for text relays).
+var PromptArchiveEnabled bool
+var PromptArchiveDir = "./prompt-archive"
+var PromptArchiveMaxRequestBytes = 1048576
+var PromptArchiveMaxResponseBytes = 1048576
+
 var TLSInsecureSkipVerify bool
 var InsecureTLSConfig = &tls.Config{InsecureSkipVerify: true}
 
