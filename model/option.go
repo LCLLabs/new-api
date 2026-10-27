@@ -80,6 +80,8 @@ func InitOptionMap() {
 	common.OptionMap["Notice"] = ""
 	common.OptionMap["About"] = ""
 	common.OptionMap["HomePageContent"] = ""
+	common.OptionMap["RootRedirectEnabled"] = strconv.FormatBool(common.RootRedirectEnabled)
+	common.OptionMap["RootRedirectURL"] = common.RootRedirectURL
 	common.OptionMap["Footer"] = common.Footer
 	common.OptionMap["SystemName"] = common.SystemName
 	common.OptionMap["Logo"] = common.Logo
@@ -234,6 +236,11 @@ func SyncOptions(frequency int) {
 func validateOptionValue(key string, value string) error {
 	if key == legacyAccessTokenRetireAtKey {
 		return errLegacyRetireAtReadOnly
+	}
+	if key == "RootRedirectURL" && strings.TrimSpace(value) != "" {
+		if err := common.ValidateRootRedirectURL(value); err != nil {
+			return err
+		}
 	}
 	if err := operation_setting.ValidateQuotaOption(key, value); err != nil {
 		return err
@@ -476,6 +483,8 @@ func updateOptionMap(key string, value string) (err error) {
 			setting.CheckSensitiveOnPromptEnabled = boolValue
 		case "ModelRequestRateLimitEnabled":
 			setting.ModelRequestRateLimitEnabled = boolValue
+		case "RootRedirectEnabled":
+			common.RootRedirectEnabled = boolValue
 		case "StopOnSensitiveEnabled":
 			setting.StopOnSensitiveEnabled = boolValue
 		case "SMTPSSLEnabled":
@@ -621,6 +630,8 @@ func updateOptionMap(key string, value string) (err error) {
 		common.SystemName = value
 	case "Logo":
 		common.Logo = value
+	case "RootRedirectURL":
+		common.RootRedirectURL = value
 	case "WeChatServerAddress":
 		common.WeChatServerAddress = value
 	case "WeChatServerToken":

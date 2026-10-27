@@ -147,6 +147,8 @@ export type SiteSettings = {
   Footer: string
   About: string
   HomePageContent: string
+  RootRedirectEnabled: boolean
+  RootRedirectURL: string
   ServerAddress: string
   TaskPublicAddress: string
   'general_setting.docs_link': string

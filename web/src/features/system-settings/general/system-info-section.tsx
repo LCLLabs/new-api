@@ -31,6 +31,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 
 import { FormDirtyIndicator } from '../components/form-dirty-indicator'
@@ -39,11 +40,14 @@ import {
   SettingsForm,
   SettingsFormGrid,
   SettingsFormGridItem,
+  SettingsSwitchContent,
+  SettingsSwitchItem,
 } from '../components/settings-form-layout'
 import { SettingsPageFormActions } from '../components/settings-page-context'
 import { SettingsSection } from '../components/settings-section'
 import { useSettingsForm } from '../hooks/use-settings-form'
 import { useUpdateOption } from '../hooks/use-update-option'
+import { isValidRootRedirectURL } from './root-redirect-url'
 import { isValidTaskPublicAddress } from './task-public-address'
 
 const _systemInfoSchema = z.object({
@@ -54,6 +58,8 @@ const _systemInfoSchema = z.object({
   Footer: z.string().optional(),
   About: z.string().optional(),
   HomePageContent: z.string().optional(),
+  RootRedirectEnabled: z.boolean(),
+  RootRedirectURL: z.string().optional(),
   general_setting: z.object({
     docs_link: z.string(),
   }),
@@ -86,6 +92,8 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
     Footer: normalizeValue(defaultValues.Footer),
     About: normalizeValue(defaultValues.About),
     HomePageContent: normalizeValue(defaultValues.HomePageContent),
+    RootRedirectEnabled: Boolean(defaultValues.RootRedirectEnabled),
+    RootRedirectURL: normalizeValue(defaultValues.RootRedirectURL),
     general_setting: {
       docs_link: normalizeValue(defaultValues.general_setting?.docs_link),
     },
@@ -95,29 +103,49 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
     },
   }
 
-  const systemInfoSchemaWithI18n = z.object({
-    SystemName: z.string().min(1, {
-      error: () => t('System name is required'),
-    }),
-    ServerAddress: z.string().optional(),
-    TaskPublicAddress: z.string().refine(isValidTaskPublicAddress, {
-      error: () =>
-        t(
-          'Enter an absolute HTTP(S) URL without credentials, query parameters, or fragments'
-        ),
-    }),
-    Logo: z.string().url().optional().or(z.literal('')),
-    Footer: z.string().optional(),
-    About: z.string().optional(),
-    HomePageContent: z.string().optional(),
-    general_setting: z.object({
-      docs_link: z.string(),
-    }),
-    legal: z.object({
-      user_agreement: z.string().optional(),
-      privacy_policy: z.string().optional(),
-    }),
-  })
+  const systemInfoSchemaWithI18n = z
+    .object({
+      SystemName: z.string().min(1, {
+        error: () => t('System name is required'),
+      }),
+      ServerAddress: z.string().optional(),
+      TaskPublicAddress: z.string().refine(isValidTaskPublicAddress, {
+        error: () =>
+          t(
+            'Enter an absolute HTTP(S) URL without credentials, query parameters, or fragments'
+          ),
+      }),
+      Logo: z.string().url().optional().or(z.literal('')),
+      Footer: z.string().optional(),
+      About: z.string().optional(),
+      HomePageContent: z.string().optional(),
+      RootRedirectEnabled: z.boolean(),
+      RootRedirectURL: z.string().refine(isValidRootRedirectURL, {
+        error: () =>
+          t('Enter an absolute HTTP(S) URL without credentials'),
+      }),
+      general_setting: z.object({
+        docs_link: z.string(),
+      }),
+      legal: z.object({
+        user_agreement: z.string().optional(),
+        privacy_policy: z.string().optional(),
+      }),
+    })
+    .superRefine((values, ctx) => {
+      if (
+        values.RootRedirectEnabled &&
+        !normalizeValue(values.RootRedirectURL).trim()
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['RootRedirectURL'],
+          message: t(
+            'Enter a redirect URL before enabling root path redirect'
+          ),
+        })
+      }
+    })
 
   const { form, handleSubmit, handleReset, isDirty, isSubmitting } =
     useSettingsForm<SystemInfoFormValues>({
@@ -128,7 +156,18 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
       >,
       defaultValues: normalizedDefaults,
       onSubmit: async (_data, changedFields) => {
+        const enabledChange = changedFields.RootRedirectEnabled
+        if (enabledChange === false) {
+          await updateOption.mutateAsync({
+            key: 'RootRedirectEnabled',
+            value: false,
+          })
+        }
+
         for (const [key, value] of Object.entries(changedFields)) {
+          if (key === 'RootRedirectEnabled') {
+            continue
+          }
           let v = normalizeValue(value)
           if (key === 'ServerAddress' || key === 'TaskPublicAddress') {
             v = v.replace(/\/+$/, '')
@@ -136,6 +175,13 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
           await updateOption.mutateAsync({
             key,
             value: v,
+          })
+        }
+
+        if (enabledChange === true) {
+          await updateOption.mutateAsync({
+            key: 'RootRedirectEnabled',
+            value: true,
           })
         }
       },
@@ -319,6 +365,55 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                       <FormDescription>
                         {t(
                           'Content displayed on the home page (supports Markdown)'
+                        )}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </SettingsFormGridItem>
+
+              <SettingsFormGridItem span='full'>
+                <FormField
+                  control={form.control}
+                  name='RootRedirectEnabled'
+                  render={({ field }) => (
+                    <SettingsSwitchItem>
+                      <SettingsSwitchContent>
+                        <FormLabel>{t('Redirect root path')}</FormLabel>
+                        <FormDescription>
+                          {t(
+                            'When enabled, GET / redirects to the URL below. Paths such as /sign-in are not redirected.'
+                          )}
+                        </FormDescription>
+                      </SettingsSwitchContent>
+                      <FormControl>
+                        <Switch
+                          checked={Boolean(field.value)}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </SettingsSwitchItem>
+                  )}
+                />
+              </SettingsFormGridItem>
+
+              <SettingsFormGridItem span='full'>
+                <FormField
+                  control={form.control}
+                  name='RootRedirectURL'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Root redirect URL')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder='https://example.com/'
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {t(
+                          'Absolute HTTP(S) destination for the root path redirect'
                         )}
                       </FormDescription>
                       <FormMessage />

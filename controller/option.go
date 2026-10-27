@@ -217,6 +217,27 @@ func UpdateOption(c *gin.Context) {
 			return
 		}
 	}
+	if option.Key == "RootRedirectEnabled" && option.Value == "true" {
+		common.OptionMapRWMutex.RLock()
+		redirectURL := common.OptionMap["RootRedirectURL"]
+		common.OptionMapRWMutex.RUnlock()
+		if err := common.ValidateRootRedirectURL(redirectURL); err != nil {
+			common.ApiErrorT(c, "Cannot enable root redirect. Enter a valid absolute HTTP(S) redirect URL first.")
+			return
+		}
+	}
+	if option.Key == "RootRedirectURL" {
+		redirectURL := option.Value.(string)
+		if strings.TrimSpace(redirectURL) == "" {
+			if common.RootRedirectEnabled {
+				common.ApiErrorT(c, "Cannot clear the root redirect URL while root redirect is enabled.")
+				return
+			}
+		} else if err := common.ValidateRootRedirectURL(redirectURL); err != nil {
+			common.ApiError(c, err)
+			return
+		}
+	}
 	switch option.Key {
 	case "GitHubOAuthEnabled":
 		if option.Value == "true" && common.GitHubClientId == "" {

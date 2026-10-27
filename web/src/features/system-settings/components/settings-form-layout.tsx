@@ -46,7 +46,7 @@ type SettingsSwitchFieldProps = SettingsSwitchRowProps & {
 }
 
 const settingsSwitchRowClassName =
-  'flex min-w-0 flex-row items-center justify-between gap-4 py-2.5'
+  '!flex min-w-0 flex-row items-center justify-between gap-4 py-2.5'
 
 export function SettingsFormGrid(props: SettingsFormGridProps) {
   return (
@@ -88,6 +88,7 @@ export function SettingsSwitchItem({
   return (
     <FormItem
       data-settings-form-span='full'
+      // FormItem defaults to `grid`; keep a horizontal switch row.
       className={cn(settingsSwitchRowClassName, className)}
       {...props}
     />
