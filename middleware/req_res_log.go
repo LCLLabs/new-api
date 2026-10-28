@@ -11,6 +11,17 @@ import (
 )
 
 const reqResLogPrefix = "[REQ-RES] "
+const finalRequestErrorKey = "final_request_error"
+
+// RememberFinalRequestError stores the error reason that will be returned to the
+// client for this request. Later calls overwrite earlier ones so only the
+// final failure reason is kept for the merged [REQ-RES] line.
+func RememberFinalRequestError(c *gin.Context, message string) {
+	if c == nil || message == "" {
+		return
+	}
+	c.Set(finalRequestErrorKey, message)
+}
 
 func appendReqResLog(line string, param gin.LogFormatterParams) string {
 	tag, _ := param.Keys[RouteTagKey].(string)
@@ -56,6 +67,9 @@ func appendReqResLog(line string, param gin.LogFormatterParams) string {
 		record["content"] = consume.Params.Content
 		record["use_time_seconds"] = consume.Params.UseTimeSeconds
 		mergeConsumeOther(record, consume.Other)
+	}
+	if msg, ok := param.Keys[finalRequestErrorKey].(string); ok && msg != "" {
+		record["error"] = msg
 	}
 	encoded, err := common.Marshal(record)
 	if err != nil {
