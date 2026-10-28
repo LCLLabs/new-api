@@ -34,3 +34,18 @@ export function isValidRootRedirectURL(value: string): boolean {
     return false
   }
 }
+
+/** Absolute destination when root redirect is enabled; otherwise null. */
+export function resolveRootRedirectHref(
+  enabled: unknown,
+  url: unknown
+): string | null {
+  const isEnabled = enabled === true || enabled === 'true'
+  if (!isEnabled || typeof url !== 'string' || url === '') {
+    return null
+  }
+  if (!isValidRootRedirectURL(url)) {
+    return null
+  }
+  return url
+}

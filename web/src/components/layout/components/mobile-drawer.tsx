@@ -32,6 +32,7 @@ import type { AuthUser } from '@/stores/auth-store'
 
 import { MOBILE_DRAWER_ANIMATION, MOBILE_DRAWER_CONFIG } from '../constants'
 import type { TopNavLink } from '../types'
+import { BrandHomeLink } from './brand-home-link'
 
 /**
  * Brand logo component with skeleton loading
@@ -54,7 +55,7 @@ function BrandLogo({
   onClick,
 }: BrandLogoProps) {
   return (
-    <Link
+    <BrandHomeLink
       to={homeUrl}
       className='flex items-center gap-2 text-xl font-bold'
       onClick={onClick}
@@ -66,7 +67,7 @@ function BrandLogo({
         {displayLogo}
       </div>
       {loading ? <Skeleton className='h-5 w-20' /> : displaySiteName}
-    </Link>
+    </BrandHomeLink>
   )
 }
 

@@ -36,6 +36,7 @@ import { useAuthStore } from '@/stores/auth-store'
 
 import { defaultTopNavLinks } from '../config/top-nav.config'
 import type { TopNavLink } from '../types'
+import { BrandHomeLink } from './brand-home-link'
 import { HeaderLogo } from './header-logo'
 
 const AUTH_PROMPT_SECONDS = 5
@@ -216,7 +217,7 @@ export function PublicHeader(props: PublicHeaderProps) {
           >
             {/* Logo */}
             <div className='@container/system-brand flex min-w-0 flex-1 items-center gap-1 lg:min-w-36'>
-              <Link
+              <BrandHomeLink
                 to={homeUrl}
                 className='group flex min-w-0 items-center gap-2.5'
               >
@@ -233,7 +234,7 @@ export function PublicHeader(props: PublicHeaderProps) {
                     displaySiteName
                   )}
                 </span>
-              </Link>
+              </BrandHomeLink>
               <SystemUpdateAction presentation='version' />
             </div>
 
