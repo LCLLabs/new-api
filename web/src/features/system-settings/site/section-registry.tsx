@@ -41,6 +41,8 @@ const SITE_SECTIONS = [
           Footer: settings.Footer,
           About: settings.About,
           HomePageContent: settings.HomePageContent,
+          RootRedirectEnabled: Boolean(settings.RootRedirectEnabled),
+          RootRedirectURL: settings.RootRedirectURL,
           ServerAddress: settings.ServerAddress,
           TaskPublicAddress: settings.TaskPublicAddress,
           general_setting: {

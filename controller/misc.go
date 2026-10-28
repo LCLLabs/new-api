@@ -64,6 +64,8 @@ func GetStatus(c *gin.Context) {
 		"theme":                       "default",
 		"system_name":                 common.SystemName,
 		"logo":                        common.Logo,
+		"root_redirect_enabled":       common.RootRedirectEnabled,
+		"root_redirect_url":           common.RootRedirectURL,
 		"footer_html":                 common.Footer,
 		"wechat_qrcode":               common.WeChatAccountQRCodeImageURL,
 		"wechat_login":                common.WeChatAuthEnabled,

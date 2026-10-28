@@ -24,6 +24,8 @@ import { useStatus } from '@/hooks/use-status'
 import { useSystemConfig } from '@/hooks/use-system-config'
 import { cn } from '@/lib/utils'
 
+import { BrandHomeLink } from './brand-home-link'
+
 interface FooterLink {
   text: string
   href: string
@@ -254,7 +256,7 @@ export function Footer(props: FooterProps) {
         <div className='flex flex-col justify-between gap-10 md:flex-row md:gap-16'>
           {/* Brand column */}
           <div className='shrink-0'>
-            <Link to='/' className='group flex items-center gap-2.5'>
+            <BrandHomeLink className='group flex items-center gap-2.5'>
               <img
                 src={displayLogo}
                 alt={displayName}
@@ -263,7 +265,7 @@ export function Footer(props: FooterProps) {
               <span className='text-sm font-semibold tracking-tight'>
                 {displayName}
               </span>
-            </Link>
+            </BrandHomeLink>
             <p className='text-muted-foreground/60 mt-3 max-w-[200px] text-xs leading-relaxed'>
               {t('Powerful API Management Platform')}
             </p>

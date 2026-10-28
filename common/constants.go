@@ -17,6 +17,11 @@ var Footer = ""
 var Logo = ""
 var TopUpLink = ""
 
+// RootRedirectEnabled redirects exact GET/HEAD "/" to RootRedirectURL when true.
+// Default false: keep serving the dashboard home page.
+var RootRedirectEnabled = false
+var RootRedirectURL = ""
+
 // var ChatLink = ""
 // var ChatLink2 = ""
 var QuotaPerUnit = 500 * 1000.0 // $0.002 / 1K tokens
