@@ -122,6 +122,55 @@ func TestRelayWithoutConsumeLogStillWritesAccessFields(t *testing.T) {
 	assert.Equal(t, "-", record["user_id"])
 	assert.Equal(t, "-", record["model_name"])
 	assert.NotContains(t, record, "quota")
+	assert.NotContains(t, record, "error")
+}
+
+func TestRelayFinalRequestErrorAppearsInReqResLog(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	previousWriter := gin.DefaultWriter
+	var output bytes.Buffer
+	gin.DefaultWriter = &output
+	t.Cleanup(func() { gin.DefaultWriter = previousWriter })
+
+	router := gin.New()
+	SetUpLogger(router)
+	router.POST("/v1/chat/completions", RouteTag("relay"), func(c *gin.Context) {
+		c.Set(common.RequestIdKey, "202610221226525022079228268d9d6zJYy1KOF")
+		RememberFinalRequestError(c, "channel error (channel #3, status code: 503): upstream unavailable")
+		RememberFinalRequestError(c, "relay error: no available channel for model glm-5.3-flash")
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": gin.H{"message": "relay error: no available channel for model glm-5.3-flash"}})
+	})
+	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil))
+
+	line, ok := reqResLine(output.String())
+	require.True(t, ok)
+	var record map[string]any
+	require.NoError(t, json.Unmarshal([]byte(line), &record))
+	assert.Equal(t, "503", record["status"])
+	assert.Equal(t, "relay error: no available channel for model glm-5.3-flash", record["error"])
+}
+
+func TestRelayAuthAbortErrorAppearsInReqResLog(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	previousWriter := gin.DefaultWriter
+	var output bytes.Buffer
+	gin.DefaultWriter = &output
+	t.Cleanup(func() { gin.DefaultWriter = previousWriter })
+
+	router := gin.New()
+	SetUpLogger(router)
+	router.POST("/v1/messages", RouteTag("relay"), func(c *gin.Context) {
+		c.Set(common.RequestIdKey, "202610280401457651619368268d9d6pVE2ebOI")
+		abortWithOpenAiMessage(c, http.StatusUnauthorized, "Invalid token")
+	})
+	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/v1/messages", nil))
+
+	line, ok := reqResLine(output.String())
+	require.True(t, ok)
+	var record map[string]any
+	require.NoError(t, json.Unmarshal([]byte(line), &record))
+	assert.Equal(t, "401", record["status"])
+	assert.Equal(t, "Invalid token", record["error"])
 }
 
 func reqResLine(output string) (string, bool) {

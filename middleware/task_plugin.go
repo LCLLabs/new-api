@@ -1252,6 +1252,7 @@ func RespondTaskPluginError(c *gin.Context, taskErr *dto.TaskError) bool {
 		return false
 	}
 	sanitized := sanitizedTaskPluginError(taskErr.StatusCode, taskErr.Message)
+	RememberFinalRequestError(c, common.LocalLogPreview(sanitized.Message))
 	requestID := c.GetString(common.RequestIdKey)
 	hasRenderer, err := pinned.Plugin.Engine.HasCallablePath(c.Request.Context(), "native", "error")
 	requestValue, exists := c.Get(pluginruntime.ContextKeyRouteRequest)
@@ -1312,6 +1313,7 @@ func abortTaskPluginRouteErrorDetail(c *gin.Context, status int, detail string) 
 	if RespondTaskPluginError(c, &dto.TaskError{Code: taskErr.Code, Message: detail, StatusCode: taskErr.HTTPStatus}) {
 		return
 	}
+	RememberFinalRequestError(c, common.LocalLogPreview(taskErr.Message))
 	message := taskErr.Message
 	if requestID := c.GetString(common.RequestIdKey); requestID != "" {
 		message = common.MessageWithRequestId(taskErr.Message, requestID)

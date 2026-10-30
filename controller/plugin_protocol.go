@@ -14,6 +14,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/logger"
+	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	pluginruntime "github.com/QuantumNous/new-api/pkg/jsplugin"
 	"github.com/QuantumNous/new-api/relay"
@@ -1285,6 +1286,7 @@ func respondPluginProtocolSubmissionError(c *gin.Context, taskErr *dto.TaskError
 }
 
 func respondPluginProtocolError(c *gin.Context, status int, code, message string) {
+	middleware.RememberFinalRequestError(c, common.LocalLogPreview(message))
 	c.JSON(status, gin.H{
 		"error": gin.H{
 			"message": message,

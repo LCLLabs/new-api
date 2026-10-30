@@ -12,6 +12,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/logger"
+	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	pluginruntime "github.com/QuantumNous/new-api/pkg/jsplugin"
 	"github.com/QuantumNous/new-api/relay"
@@ -252,6 +253,7 @@ func respondTaskPluginImageError(c *gin.Context, taskErr *dto.TaskError) {
 	if status < http.StatusInternalServerError {
 		errorType = "invalid_request_error"
 	}
+	middleware.RememberFinalRequestError(c, common.LocalLogPreview(message))
 	c.JSON(status, gin.H{"error": gin.H{
 		"message": common.MessageWithRequestId(message, c.GetString(common.RequestIdKey)),
 		"type":    errorType,
