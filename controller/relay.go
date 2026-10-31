@@ -99,6 +99,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			middleware.RememberFinalRequestError(c, finalError)
 			logger.LogError(c, common.LogText("relay error: %s", finalError))
 			newAPIError.SetMessage(common.MessageWithRequestId(newAPIError.Error(), requestId))
+			service.MapUpstreamErrorForClient(newAPIError)
 			upstreamURLs := common.UpstreamAddresses(c)
 			if relayFormat != types.RelayFormatOpenAIRealtime && c.Writer.Written() &&
 				strings.HasPrefix(c.Writer.Header().Get("Content-Type"), "text/event-stream") {
@@ -814,7 +815,11 @@ func respondTaskSubmissionError(c *gin.Context, taskErr *taskdto.TaskError) {
 	service.RecordRequestPolicyTermination(c, taskSubmissionAPIError(taskErr))
 	newTaskPluginSubmitDiagnostics(c).presentError(taskErr)
 	if taskErr != nil {
+		if !taskErr.LocalError && taskErr.StatusCode == http.StatusTooManyRequests {
+			taskErr.Message = i18n.T(c, i18n.MsgRelayGroupUpstreamSaturated)
+		}
 		middleware.RememberFinalRequestError(c, common.LocalLogPreview(taskErr.Message))
+		service.MapUpstreamTaskErrorForClient(taskErr)
 	}
 	if middleware.RespondTaskPluginError(c, taskErr) {
 		return
@@ -827,6 +832,7 @@ func respondTaskError(c *gin.Context, taskErr *taskdto.TaskError) {
 	if taskErr.StatusCode == http.StatusTooManyRequests {
 		taskErr.Message = i18n.T(c, i18n.MsgRelayGroupUpstreamSaturated)
 	}
+	service.MapUpstreamTaskErrorForClient(taskErr)
 	middleware.RememberFinalRequestError(c, common.LocalLogPreview(taskErr.Message))
 	c.JSON(taskErr.StatusCode, taskErr)
 }
