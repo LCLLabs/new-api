@@ -225,10 +225,17 @@ func ValidateUserToken(key string) (token *Token, err error) {
 	}
 	token, err = GetTokenByKey(key, false)
 	if err == nil {
-		if token.Status == common.TokenStatusExhausted ||
-			token.Status == common.TokenStatusExpired ||
-			token.Status != common.TokenStatusEnabled {
-			return token, ErrTokenInvalid
+		switch token.Status {
+		case common.TokenStatusEnabled:
+			// continue checks below
+		case common.TokenStatusExpired:
+			return token, ErrTokenExpired
+		case common.TokenStatusExhausted:
+			return token, ErrTokenExhausted
+		case common.TokenStatusDisabled:
+			return token, ErrTokenDisabled
+		default:
+			return token, ErrTokenDisabled
 		}
 		if token.ExpiredTime != -1 && token.ExpiredTime < common.GetTimestamp() {
 			if !common.RedisEnabled {
@@ -238,7 +245,7 @@ func ValidateUserToken(key string) (token *Token, err error) {
 					common.SysLog(common.LogText("failed to update token status%s", err.Error()))
 				}
 			}
-			return token, ErrTokenInvalid
+			return token, ErrTokenExpired
 		}
 		if !token.UnlimitedQuota && token.RemainQuota <= 0 {
 			if !common.RedisEnabled {
@@ -248,7 +255,7 @@ func ValidateUserToken(key string) (token *Token, err error) {
 					common.SysLog(common.LogText("failed to update token status%s", err.Error()))
 				}
 			}
-			return token, ErrTokenInvalid
+			return token, ErrTokenExhausted
 		}
 		return token, nil
 	}
