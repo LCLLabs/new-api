@@ -1263,6 +1263,9 @@ func writeTaskPluginProtocolEvent(c *gin.Context, event dto.PluginResponsesStrea
 }
 
 func respondPluginProtocolSubmissionError(c *gin.Context, taskErr *dto.TaskError) {
+	if taskErr != nil {
+		service.MapUpstreamTaskErrorForClient(taskErr)
+	}
 	status := http.StatusInternalServerError
 	if taskErr != nil && taskErr.StatusCode >= 400 && taskErr.StatusCode <= 599 {
 		status = taskErr.StatusCode
@@ -1281,7 +1284,11 @@ func respondPluginProtocolSubmissionError(c *gin.Context, taskErr *dto.TaskError
 	case http.StatusTooManyRequests:
 		respondPluginProtocolError(c, status, "rate_limit_exceeded", "Too many requests")
 	default:
-		respondPluginProtocolError(c, status, "task_protocol_error", "Task protocol request failed")
+		code := "task_protocol_error"
+		if status >= http.StatusInternalServerError {
+			code = "upstream_error"
+		}
+		respondPluginProtocolError(c, status, code, "Task protocol request failed")
 	}
 }
 

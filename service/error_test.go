@@ -63,6 +63,117 @@ func TestResetStatusCode(t *testing.T) {
 	}
 }
 
+func TestMapUpstreamErrorForClient(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name       string
+		err        *types.NewAPIError
+		wantStatus int
+		prepare    func(*types.NewAPIError)
+	}{
+		{
+			name:       "upstream 400 becomes 502",
+			err:        types.NewOpenAIError(fmt.Errorf("bad request"), types.ErrorCodeBadResponseStatusCode, http.StatusBadRequest),
+			wantStatus: http.StatusBadGateway,
+		},
+		{
+			name:       "upstream 401 becomes 502",
+			err:        types.NewOpenAIError(fmt.Errorf("invalid api key"), types.ErrorCodeBadResponseStatusCode, http.StatusUnauthorized),
+			wantStatus: http.StatusBadGateway,
+		},
+		{
+			name:       "upstream 403 becomes 502",
+			err:        types.NewOpenAIError(fmt.Errorf("forbidden"), types.ErrorCodeBadResponseStatusCode, http.StatusForbidden),
+			wantStatus: http.StatusBadGateway,
+		},
+		{
+			name:       "upstream 422 becomes 502",
+			err:        types.NewOpenAIError(fmt.Errorf("unprocessable"), types.ErrorCodeBadResponseStatusCode, http.StatusUnprocessableEntity),
+			wantStatus: http.StatusBadGateway,
+		},
+		{
+			name:       "upstream 429 becomes 503",
+			err:        types.NewOpenAIError(fmt.Errorf("rate limited"), types.ErrorCodeBadResponseStatusCode, http.StatusTooManyRequests),
+			wantStatus: http.StatusServiceUnavailable,
+		},
+		{
+			name:       "upstream 408 becomes 504",
+			err:        types.NewOpenAIError(fmt.Errorf("timeout"), types.ErrorCodeBadResponseStatusCode, http.StatusRequestTimeout),
+			wantStatus: http.StatusGatewayTimeout,
+		},
+		{
+			name:       "upstream 504 stays 504",
+			err:        types.NewOpenAIError(fmt.Errorf("gateway timeout"), types.ErrorCodeBadResponseStatusCode, http.StatusGatewayTimeout),
+			wantStatus: http.StatusGatewayTimeout,
+		},
+		{
+			name:       "upstream 500 stays 500",
+			err:        types.NewOpenAIError(fmt.Errorf("server error"), types.ErrorCodeBadResponseStatusCode, http.StatusInternalServerError),
+			wantStatus: http.StatusInternalServerError,
+		},
+		{
+			name:       "channel invalid key becomes 502",
+			err:        types.NewErrorWithStatusCode(fmt.Errorf("bad key"), types.ErrorCodeChannelInvalidKey, http.StatusUnauthorized),
+			wantStatus: http.StatusBadGateway,
+		},
+		{
+			name:       "do request failed with zero status becomes 502",
+			err:        types.NewErrorWithStatusCode(fmt.Errorf("dial tcp"), types.ErrorCodeDoRequestFailed, 0),
+			wantStatus: http.StatusBadGateway,
+		},
+		{
+			name:       "local invalid request stays 400",
+			err:        types.NewError(fmt.Errorf("missing model"), types.ErrorCodeInvalidRequest, types.ErrOptionWithStatusCode(http.StatusBadRequest), types.ErrOptionWithSkipRetry()),
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "local insufficient quota stays 403",
+			err:        types.NewErrorWithStatusCode(fmt.Errorf("quota"), types.ErrorCodeInsufficientUserQuota, http.StatusForbidden),
+			wantStatus: http.StatusForbidden,
+		},
+		{
+			name: "status_code_mapping to 4xx still lifted to 502",
+			err:  types.NewOpenAIError(fmt.Errorf("upstream auth"), types.ErrorCodeBadResponseStatusCode, http.StatusUnauthorized),
+			prepare: func(err *types.NewAPIError) {
+				ResetStatusCode(err, `{"401":"400"}`)
+			},
+			wantStatus: http.StatusBadGateway,
+		},
+		{
+			name: "status_code_mapping to 5xx kept",
+			err:  types.NewOpenAIError(fmt.Errorf("upstream auth"), types.ErrorCodeBadResponseStatusCode, http.StatusUnauthorized),
+			prepare: func(err *types.NewAPIError) {
+				ResetStatusCode(err, `{"401":"502"}`)
+			},
+			wantStatus: http.StatusBadGateway,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if tc.prepare != nil {
+				tc.prepare(tc.err)
+			}
+			MapUpstreamErrorForClient(tc.err)
+			require.Equal(t, tc.wantStatus, tc.err.StatusCode)
+		})
+	}
+}
+
+func TestMapUpstreamTaskErrorForClient(t *testing.T) {
+	t.Parallel()
+
+	upstream := TaskErrorWrapper(fmt.Errorf("invalid credential"), "upstream_auth", http.StatusUnauthorized)
+	MapUpstreamTaskErrorForClient(upstream)
+	require.Equal(t, http.StatusBadGateway, upstream.StatusCode)
+
+	local := TaskErrorWrapperLocal(fmt.Errorf("bad params"), "invalid_request", http.StatusBadRequest)
+	MapUpstreamTaskErrorForClient(local)
+	require.Equal(t, http.StatusBadRequest, local.StatusCode)
+}
+
 func TestRelayErrorHandlerTruncatesInvalidJSONBodyInLog(t *testing.T) {
 	withDebugEnabled(t, false)
 

@@ -162,6 +162,103 @@ func ResetStatusCode(newApiErr *types.NewAPIError, statusCodeMappingStr string) 
 	}
 }
 
+// MapUpstreamErrorForClient rewrites upstream/channel failure status codes for
+// the API client only. Call after retry, auto-ban, and metrics have already used
+// the original StatusCode. Local new-api client errors stay unchanged so 4xx
+// remains reserved for customer-side failures.
+func MapUpstreamErrorForClient(err *types.NewAPIError) {
+	if err == nil || !isUpstreamFacingError(err) {
+		return
+	}
+	err.StatusCode = MapUpstreamErrorStatusForClient(err.StatusCode)
+}
+
+// MapUpstreamTaskErrorForClient applies the same client-facing status rewrite to
+// task errors that originated from upstream/channel failures.
+func MapUpstreamTaskErrorForClient(taskErr *taskdto.TaskError) {
+	if taskErr == nil || taskErr.LocalError {
+		return
+	}
+	taskErr.StatusCode = MapUpstreamErrorStatusForClient(taskErr.StatusCode)
+}
+
+// MapUpstreamErrorStatusForClient maps an upstream HTTP status to the status
+// returned to API clients: timeouts to 504, rate limits to 503, other 4xx to
+// 502, and existing 5xx unchanged.
+func MapUpstreamErrorStatusForClient(statusCode int) int {
+	if statusCode >= 500 && statusCode <= 599 {
+		return statusCode
+	}
+	switch statusCode {
+	case http.StatusRequestTimeout, http.StatusGatewayTimeout:
+		return http.StatusGatewayTimeout
+	case http.StatusTooManyRequests:
+		return http.StatusServiceUnavailable
+	default:
+		if statusCode >= 400 && statusCode <= 499 {
+			return http.StatusBadGateway
+		}
+		return http.StatusBadGateway
+	}
+}
+
+func isUpstreamFacingError(err *types.NewAPIError) bool {
+	if err == nil {
+		return false
+	}
+	if isLocalClientFacingError(err) {
+		return false
+	}
+	if types.IsChannelError(err) {
+		return true
+	}
+	switch err.GetErrorCode() {
+	case types.ErrorCodeBadResponseStatusCode,
+		types.ErrorCodeBadResponse,
+		types.ErrorCodeBadResponseBody,
+		types.ErrorCodeDoRequestFailed,
+		types.ErrorCodeEmptyResponse,
+		types.ErrorCodeReadResponseBodyFailed,
+		types.ErrorCodeAwsInvokeError,
+		types.ErrorCodeGetChannelFailed:
+		return true
+	}
+	switch err.GetErrorType() {
+	case types.ErrorTypeOpenAIError,
+		types.ErrorTypeClaudeError,
+		types.ErrorTypeUpstreamError,
+		types.ErrorTypeGeminiError,
+		types.ErrorTypeRerankError,
+		types.ErrorTypeMidjourneyError:
+		return true
+	}
+	return false
+}
+
+func isLocalClientFacingError(err *types.NewAPIError) bool {
+	switch err.GetErrorCode() {
+	case types.ErrorCodeInvalidRequest,
+		types.ErrorCodeReadRequestBodyFailed,
+		types.ErrorCodeInsufficientUserQuota,
+		types.ErrorCodePreConsumeTokenQuotaFailed,
+		types.ErrorCodeSensitiveWordsDetected,
+		types.ErrorCodeAccessDenied,
+		types.ErrorCodeModelPriceError,
+		types.ErrorCodeInvalidApiType,
+		types.ErrorCodeCountTokenFailed,
+		types.ErrorCodeConvertRequestFailed,
+		types.ErrorCodeBadRequestBody,
+		types.ErrorCodeModelNotFound,
+		types.ErrorCodePromptBlocked,
+		types.ErrorCodeViolationFeeGrokCSAM,
+		types.ErrorCodeGenRelayInfoFailed,
+		types.ErrorCodeJsonMarshalFailed:
+		return true
+	default:
+		return false
+	}
+}
+
 func parseStatusCodeMappingValue(value any) (int, bool) {
 	switch v := value.(type) {
 	case string:
