@@ -335,7 +335,7 @@ func PinTaskPluginEndpoint() gin.HandlerFunc {
 		modelRequest, err := getModelFromRequest(c)
 		if err != nil {
 			if _, _, protocolPath := pluginruntime.LookupHostProtocolOperation(c.Request.Method, c.Request.URL.Path); protocolPath {
-				abortWithOpenAiMessage(c, invalidRequestStatus(err), i18n.T(c, i18n.MsgDistributorInvalidRequest, map[string]any{"Error": err.Error()}))
+				abortWithOpenAiMessageKey(c, invalidRequestStatus(err), i18n.MsgDistributorInvalidRequest, map[string]any{"Error": err.Error()})
 				return
 			}
 			c.Next()

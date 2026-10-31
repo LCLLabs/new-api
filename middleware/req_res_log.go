@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/gin-gonic/gin"
 )
@@ -67,6 +68,8 @@ func appendReqResLog(line string, param gin.LogFormatterParams) string {
 		record["content"] = consume.Params.Content
 		record["use_time_seconds"] = consume.Params.UseTimeSeconds
 		mergeConsumeOther(record, consume.Other)
+	} else {
+		fillReqResIdentityFromContext(record, param.Keys)
 	}
 	if msg, ok := param.Keys[finalRequestErrorKey].(string); ok && msg != "" {
 		record["error"] = msg
@@ -76,6 +79,48 @@ func appendReqResLog(line string, param gin.LogFormatterParams) string {
 		return line
 	}
 	return line + reqResLogPrefix + string(encoded) + "\n"
+}
+
+func fillReqResIdentityFromContext(record map[string]any, keys map[string]any) {
+	if id, ok := contextInt(keys, "id"); ok && id > 0 {
+		record["user_id"] = strconv.Itoa(id)
+	}
+	if tokenID, ok := contextInt(keys, "token_id"); ok && tokenID > 0 {
+		record["token_id"] = strconv.Itoa(tokenID)
+	}
+	if name, ok := keys["token_name"].(string); ok && name != "" {
+		record["token_name"] = name
+	}
+	if group, ok := keys[string(constant.ContextKeyUsingGroup)].(string); ok && group != "" {
+		record["group"] = group
+	} else if group, ok := keys["group"].(string); ok && group != "" {
+		record["group"] = group
+	}
+}
+
+func contextInt(keys map[string]any, key string) (int, bool) {
+	value, ok := keys[key]
+	if !ok || value == nil {
+		return 0, false
+	}
+	switch v := value.(type) {
+	case int:
+		return v, true
+	case int32:
+		return int(v), true
+	case int64:
+		return int(v), true
+	case float64:
+		return int(v), true
+	case string:
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return 0, false
+		}
+		return n, true
+	default:
+		return 0, false
+	}
 }
 
 func filterLabel(value string) string {

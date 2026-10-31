@@ -534,3 +534,20 @@ func TestApplyWebSocketSubprotocolAuthorizationReadsRepeatedHeaders(t *testing.T
 	assert.True(t, applyWebSocketSubprotocolAuthorization(header))
 	assert.Equal(t, "Bearer sk-later-field", header.Get("Authorization"))
 }
+
+func TestTokenAuthFailureMessageKey(t *testing.T) {
+	cases := []struct {
+		err  error
+		want string
+	}{
+		{model.ErrTokenExpired, i18n.MsgTokenExpired},
+		{model.ErrTokenExhausted, i18n.MsgTokenExhausted},
+		{model.ErrTokenDisabled, i18n.MsgTokenDisabled},
+		{model.ErrTokenNotProvided, i18n.MsgTokenNotProvided},
+		{model.ErrTokenInvalid, i18n.MsgTokenInvalid},
+		{errors.New("other"), i18n.MsgTokenInvalid},
+	}
+	for _, tc := range cases {
+		assert.Equal(t, tc.want, tokenAuthFailureMessageKey(tc.err), tc.err.Error())
+	}
+}

@@ -93,7 +93,7 @@ func redisRateLimitHandler(subject string, duration int64, totalMaxCount, succes
 			return
 		}
 		if !allowed {
-			abortWithOpenAiMessage(c, http.StatusTooManyRequests, i18n.T(c, i18n.MsgRateLimitReached, map[string]any{"Minutes": setting.ModelRequestRateLimitDurationMinutes, "Max": successMaxCount}))
+			abortWithOpenAiMessageKey(c, http.StatusTooManyRequests, i18n.MsgRateLimitReached, map[string]any{"Minutes": setting.ModelRequestRateLimitDurationMinutes, "Max": successMaxCount})
 			return
 		}
 
@@ -117,7 +117,7 @@ func redisRateLimitHandler(subject string, duration int64, totalMaxCount, succes
 			}
 
 			if !allowed {
-				abortWithOpenAiMessage(c, http.StatusTooManyRequests, i18n.T(c, i18n.MsgRateLimitTotalReached, map[string]any{"Minutes": setting.ModelRequestRateLimitDurationMinutes, "Max": totalMaxCount}))
+				abortWithOpenAiMessageKey(c, http.StatusTooManyRequests, i18n.MsgRateLimitTotalReached, map[string]any{"Minutes": setting.ModelRequestRateLimitDurationMinutes, "Max": totalMaxCount})
 				return
 			}
 		}
@@ -142,7 +142,7 @@ func memoryRateLimitHandler(subject string, duration int64, totalMaxCount, succe
 
 		// 1. 检查总请求数限制（当totalMaxCount为0时跳过）
 		if totalMaxCount > 0 && !inMemoryRateLimiter.Request(totalKey, totalMaxCount, duration) {
-			abortWithOpenAiMessage(c, http.StatusTooManyRequests, i18n.T(c, i18n.MsgRateLimitTotalReached, map[string]any{"Minutes": setting.ModelRequestRateLimitDurationMinutes, "Max": totalMaxCount}))
+			abortWithOpenAiMessageKey(c, http.StatusTooManyRequests, i18n.MsgRateLimitTotalReached, map[string]any{"Minutes": setting.ModelRequestRateLimitDurationMinutes, "Max": totalMaxCount})
 			return
 		}
 
@@ -150,7 +150,7 @@ func memoryRateLimitHandler(subject string, duration int64, totalMaxCount, succe
 		if successMaxCount > 0 {
 			reservation = inMemoryRateLimiter.Reserve(successKey, successMaxCount, duration)
 			if reservation == nil {
-				abortWithOpenAiMessage(c, http.StatusTooManyRequests, i18n.T(c, i18n.MsgRateLimitReached, map[string]any{"Minutes": setting.ModelRequestRateLimitDurationMinutes, "Max": successMaxCount}))
+				abortWithOpenAiMessageKey(c, http.StatusTooManyRequests, i18n.MsgRateLimitReached, map[string]any{"Minutes": setting.ModelRequestRateLimitDurationMinutes, "Max": successMaxCount})
 				return
 			}
 			defer reservation.Complete(false)

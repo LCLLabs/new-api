@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -171,6 +173,62 @@ func TestRelayAuthAbortErrorAppearsInReqResLog(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(line), &record))
 	assert.Equal(t, "401", record["status"])
 	assert.Equal(t, "Invalid token", record["error"])
+}
+
+func TestRelayReqResLogKeepsEnglishWhenResponseIsTranslated(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	require.NoError(t, i18n.Init())
+	previousWriter := gin.DefaultWriter
+	var output bytes.Buffer
+	gin.DefaultWriter = &output
+	t.Cleanup(func() { gin.DefaultWriter = previousWriter })
+
+	router := gin.New()
+	SetUpLogger(router)
+	router.POST("/v1/messages", RouteTag("relay"), func(c *gin.Context) {
+		abortWithOpenAiMessageKey(c, http.StatusUnauthorized, i18n.MsgTokenExpired, nil)
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+	req.Header.Set("Accept-Language", "zh-CN")
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, req)
+
+	assert.Contains(t, recorder.Body.String(), "令牌已过期")
+	line, ok := reqResLine(output.String())
+	require.True(t, ok)
+	var record map[string]any
+	require.NoError(t, json.Unmarshal([]byte(line), &record))
+	assert.Equal(t, "Token expired", record["error"])
+}
+
+func TestRelayReqResLogFillsIdentityFromContextWithoutConsumeLog(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	previousWriter := gin.DefaultWriter
+	var output bytes.Buffer
+	gin.DefaultWriter = &output
+	t.Cleanup(func() { gin.DefaultWriter = previousWriter })
+
+	router := gin.New()
+	SetUpLogger(router)
+	router.POST("/v1/messages", RouteTag("relay"), func(c *gin.Context) {
+		c.Set("id", 42)
+		c.Set("token_id", 7)
+		c.Set("token_name", "expired-token")
+		common.SetContextKey(c, constant.ContextKeyUsingGroup, "default")
+		abortWithOpenAiMessageKey(c, http.StatusUnauthorized, i18n.MsgTokenExpired, nil)
+	})
+	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/v1/messages", nil))
+
+	line, ok := reqResLine(output.String())
+	require.True(t, ok)
+	var record map[string]any
+	require.NoError(t, json.Unmarshal([]byte(line), &record))
+	assert.Equal(t, "401", record["status"])
+	assert.Equal(t, "Token expired", record["error"])
+	assert.Equal(t, "42", record["user_id"])
+	assert.Equal(t, "7", record["token_id"])
+	assert.Equal(t, "expired-token", record["token_name"])
+	assert.Equal(t, "default", record["group"])
 }
 
 func reqResLine(output string) (string, bool) {

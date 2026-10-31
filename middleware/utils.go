@@ -5,6 +5,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/logger"
 	pluginruntime "github.com/QuantumNous/new-api/pkg/jsplugin"
 	"github.com/QuantumNous/new-api/relaykit/types"
@@ -34,6 +35,17 @@ func abortWithOpenAiMessage(c *gin.Context, statusCode int, message string, code
 	}
 	c.Abort()
 	logger.LogError(c.Request.Context(), common.LogText("user %d | %s", userId, message))
+}
+
+// abortWithOpenAiMessageKey responds in the request language and overwrites
+// [REQ-RES].error with the English text afterward.
+func abortWithOpenAiMessageKey(c *gin.Context, statusCode int, key string, params map[string]any, code ...types.ErrorCode) {
+	var args []map[string]any
+	if params != nil {
+		args = []map[string]any{params}
+	}
+	abortWithOpenAiMessage(c, statusCode, i18n.T(c, key, args...), code...)
+	RememberFinalRequestError(c, common.LocalLogPreview(i18n.Translate("en", key, args...)))
 }
 
 // invalidRequestStatus is the status of a request whose body could not be
