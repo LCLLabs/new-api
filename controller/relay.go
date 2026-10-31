@@ -96,6 +96,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		if newAPIError != nil {
 			service.RecordRequestPolicyTermination(c, newAPIError)
 			logger.LogError(c, common.LogText("relay error: %s", common.LocalLogPreview(newAPIError.Error())))
+			common.RememberReqResError(c, newAPIError.Error())
 			newAPIError.SetMessage(common.MessageWithRequestId(newAPIError.Error(), requestId))
 			upstreamURLs := common.UpstreamAddresses(c)
 			if relayFormat != types.RelayFormatOpenAIRealtime && c.Writer.Written() &&
@@ -355,8 +356,10 @@ func RelayMidjourney(c *gin.Context) {
 	relayInfo, err := relaycommon.GenRelayInfo(c, types.RelayFormatMjProxy, nil, nil)
 
 	if err != nil {
+		msg := fmt.Sprintf("failed to generate relay info: %s", err.Error())
+		common.RememberReqResError(c, msg)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"description": fmt.Sprintf("failed to generate relay info: %s", err.Error()),
+			"description": msg,
 			"type":        "upstream_error",
 			"code":        4,
 		})
@@ -385,13 +388,15 @@ func RelayMidjourney(c *gin.Context) {
 			mjErr.Result = i18n.T(c, i18n.MsgRelayGroupSaturated)
 			statusCode = http.StatusTooManyRequests
 		}
+		msg := fmt.Sprintf("%s %s", mjErr.Description, mjErr.Result)
+		common.RememberReqResError(c, msg)
 		c.JSON(statusCode, gin.H{
-			"description": fmt.Sprintf("%s %s", mjErr.Description, mjErr.Result),
+			"description": msg,
 			"type":        "upstream_error",
 			"code":        mjErr.Code,
 		})
 		channelId := c.GetInt("channel_id")
-		logger.LogError(c, common.LogText("relay error (channel #%d, status code %d): %s", channelId, statusCode, fmt.Sprintf("%s %s", mjErr.Description, mjErr.Result)))
+		logger.LogError(c, common.LogText("relay error (channel #%d, status code %d): %s", channelId, statusCode, msg))
 	}
 }
 
@@ -402,6 +407,7 @@ func RelayNotImplemented(c *gin.Context) {
 		Param:   "",
 		Code:    "api_not_implemented",
 	}
+	common.RememberReqResError(c, err.Message)
 	c.JSON(http.StatusNotImplemented, gin.H{
 		"error": err,
 	})

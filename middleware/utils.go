@@ -5,6 +5,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/logger"
 	pluginruntime "github.com/QuantumNous/new-api/pkg/jsplugin"
 	"github.com/QuantumNous/new-api/relaykit/types"
@@ -32,7 +33,19 @@ func abortWithOpenAiMessage(c *gin.Context, statusCode int, message string, code
 		})
 	}
 	c.Abort()
+	common.RememberReqResError(c, message)
 	logger.LogError(c.Request.Context(), common.LogText("user %d | %s", userId, message))
+}
+
+// abortWithOpenAiMessageKey responds in the request language and always records
+// the English text in [REQ-RES].
+func abortWithOpenAiMessageKey(c *gin.Context, statusCode int, key string, params map[string]any, code ...types.ErrorCode) {
+	var args []map[string]any
+	if params != nil {
+		args = []map[string]any{params}
+	}
+	common.RememberReqResError(c, i18n.Translate("en", key, args...))
+	abortWithOpenAiMessage(c, statusCode, i18n.T(c, key, args...), code...)
 }
 
 // invalidRequestStatus is the status of a request whose body could not be
@@ -51,5 +64,6 @@ func abortWithMidjourneyMessage(c *gin.Context, statusCode int, code int, descri
 		"code":        code,
 	})
 	c.Abort()
+	common.RememberReqResError(c, description)
 	logger.LogError(c.Request.Context(), description)
 }

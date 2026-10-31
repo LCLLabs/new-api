@@ -178,6 +178,23 @@ func GetContextKeyString(c *gin.Context, key constant.ContextKey) string {
 	return c.GetString(string(key))
 }
 
+// RememberReqResError stores the English failure reason for [REQ-RES].
+// The first non-empty value wins so a later localized abort message does not
+// overwrite it. Long text is truncated with LocalLogPreview.
+func RememberReqResError(c *gin.Context, message string) {
+	if c == nil {
+		return
+	}
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return
+	}
+	if GetContextKeyString(c, constant.ContextKeyReqResError) != "" {
+		return
+	}
+	SetContextKey(c, constant.ContextKeyReqResError, LocalLogPreview(message))
+}
+
 // presetUpstreamHosts are the hosts, with any port, of the default base URLs
 // new-api presets for channel types. They are public endpoints, so errors keep
 // them readable. The port keeps a configured localhost upstream apart from the

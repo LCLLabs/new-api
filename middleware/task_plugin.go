@@ -335,7 +335,7 @@ func PinTaskPluginEndpoint() gin.HandlerFunc {
 		modelRequest, err := getModelFromRequest(c)
 		if err != nil {
 			if _, _, protocolPath := pluginruntime.LookupHostProtocolOperation(c.Request.Method, c.Request.URL.Path); protocolPath {
-				abortWithOpenAiMessage(c, invalidRequestStatus(err), i18n.T(c, i18n.MsgDistributorInvalidRequest, map[string]any{"Error": err.Error()}))
+				abortWithOpenAiMessageKey(c, invalidRequestStatus(err), i18n.MsgDistributorInvalidRequest, map[string]any{"Error": err.Error()})
 				return
 			}
 			c.Next()
@@ -1252,6 +1252,7 @@ func RespondTaskPluginError(c *gin.Context, taskErr *dto.TaskError) bool {
 		return false
 	}
 	sanitized := sanitizedTaskPluginError(taskErr.StatusCode, taskErr.Message)
+	common.RememberReqResError(c, sanitized.Message)
 	requestID := c.GetString(common.RequestIdKey)
 	hasRenderer, err := pinned.Plugin.Engine.HasCallablePath(c.Request.Context(), "native", "error")
 	requestValue, exists := c.Get(pluginruntime.ContextKeyRouteRequest)
@@ -1309,6 +1310,7 @@ func abortTaskPluginRouteError(c *gin.Context, status int) {
 func abortTaskPluginRouteErrorDetail(c *gin.Context, status int, detail string) {
 	taskErr := sanitizedTaskPluginError(status, detail)
 	c.Abort()
+	common.RememberReqResError(c, taskErr.Message)
 	if RespondTaskPluginError(c, &dto.TaskError{Code: taskErr.Code, Message: detail, StatusCode: taskErr.HTTPStatus}) {
 		return
 	}

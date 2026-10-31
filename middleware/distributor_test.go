@@ -283,7 +283,9 @@ func TestNoAvailableChannelMessageWithoutPlugin(t *testing.T) {
 	plain, _ := gin.CreateTestContext(nil)
 	plain.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
 	plain.Request.Header.Set("Accept-Language", "en")
-	generic := noAvailableChannelMessage(plain, "default", "gpt-4o")
+	key, params := noAvailableChannelMessageKey(plain, "default", "gpt-4o")
+	assert.Equal(t, i18n.MsgDistributorNoAvailableChannel, key)
+	generic := i18n.Translate("en", key, params)
 	assert.NotContains(t, generic, "task plugin")
 	assert.Contains(t, generic, "gpt-4o")
 }

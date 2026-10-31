@@ -70,6 +70,10 @@ const (
 	// It is not returned to end users, but can be persisted into consume/error logs for debugging.
 	ContextKeyAdminRejectReason ContextKey = "admin_reject_reason"
 
+	// ContextKeyReqResError stores the English failure reason for the merged
+	// [REQ-RES] access log on non-2xx relay requests.
+	ContextKeyReqResError ContextKey = "req_res_error"
+
 	// ContextKeyLanguage stores the user's language preference for i18n
 	ContextKeyLanguage             ContextKey = "language"
 	ContextKeyIsStream             ContextKey = "is_stream"

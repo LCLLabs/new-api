@@ -47,7 +47,7 @@ func Distribute() func(c *gin.Context) {
 		service.AppendTaskPluginIdentityFilter(c, c.GetString("expected_task_plugin_key"))
 		modelRequest, shouldSelectChannel, err := getModelRequest(c)
 		if err != nil {
-			abortWithOpenAiMessage(c, invalidRequestStatus(err), i18n.T(c, i18n.MsgDistributorInvalidRequest, map[string]any{"Error": err.Error()}))
+			abortWithOpenAiMessageKey(c, invalidRequestStatus(err), i18n.MsgDistributorInvalidRequest, map[string]any{"Error": err.Error()})
 			return
 		}
 		_, pinned, _ := constraints.ResolvedPin()
@@ -59,7 +59,7 @@ func Distribute() func(c *gin.Context) {
 				s, ok := common.GetContextKey(c, constant.ContextKeyTokenModelLimit)
 				if !ok {
 					// token model limit is empty, all models are not allowed
-					abortWithOpenAiMessage(c, http.StatusForbidden, i18n.T(c, i18n.MsgDistributorTokenNoModelAccess))
+					abortWithOpenAiMessageKey(c, http.StatusForbidden, i18n.MsgDistributorTokenNoModelAccess, nil)
 					return
 				}
 				var tokenModelLimit map[string]bool
@@ -68,14 +68,14 @@ func Distribute() func(c *gin.Context) {
 					tokenModelLimit = map[string]bool{}
 				}
 				if !TokenModelLimitAllows(tokenModelLimit, modelRequest.Model) {
-					abortWithOpenAiMessage(c, http.StatusForbidden, i18n.T(c, i18n.MsgDistributorTokenModelForbidden, map[string]any{"Model": modelRequest.Model}))
+					abortWithOpenAiMessageKey(c, http.StatusForbidden, i18n.MsgDistributorTokenModelForbidden, map[string]any{"Model": modelRequest.Model})
 					return
 				}
 			}
 
 			if shouldSelectChannel {
 				if modelRequest.Model == "" {
-					abortWithOpenAiMessage(c, http.StatusBadRequest, i18n.T(c, i18n.MsgDistributorModelNameRequired))
+					abortWithOpenAiMessageKey(c, http.StatusBadRequest, i18n.MsgDistributorModelNameRequired, nil)
 					return
 				}
 				// check path is /pg/chat/completions
@@ -84,12 +84,12 @@ func Distribute() func(c *gin.Context) {
 					playgroundRequest := &dto.PlayGroundRequest{}
 					err = common.UnmarshalBodyReusable(c, playgroundRequest)
 					if err != nil {
-						abortWithOpenAiMessage(c, http.StatusBadRequest, i18n.T(c, i18n.MsgDistributorInvalidPlayground, map[string]any{"Error": err.Error()}))
+						abortWithOpenAiMessageKey(c, http.StatusBadRequest, i18n.MsgDistributorInvalidPlayground, map[string]any{"Error": err.Error()})
 						return
 					}
 					if playgroundRequest.Group != "" {
 						if !service.GroupInUserUsableGroups(usingGroup, playgroundRequest.Group) && playgroundRequest.Group != usingGroup {
-							abortWithOpenAiMessage(c, http.StatusForbidden, i18n.T(c, i18n.MsgDistributorGroupAccessDenied))
+							abortWithOpenAiMessageKey(c, http.StatusForbidden, i18n.MsgDistributorGroupAccessDenied, nil)
 							return
 						}
 						common.SetContextKey(c, constant.ContextKeyUsingGroup, playgroundRequest.Group)
@@ -111,13 +111,16 @@ func Distribute() func(c *gin.Context) {
 				if selectErr.FilterKind == taskdto.FilterTaskPluginIdentity {
 					logTaskPluginChannelDecision(c, selectErr.Channel, modelRequest.Model, "channel_rejected", "identity_mismatch")
 				}
-				message := selectErr.Message
 				if selectErr.NoAvailableChannel {
-					message = noAvailableChannelMessage(c, usingGroup, modelRequest.Model)
-				} else if selectErr.MessageID != "" {
-					message = i18n.T(c, selectErr.MessageID, selectErr.Params)
+					key, params := noAvailableChannelMessageKey(c, usingGroup, modelRequest.Model)
+					abortWithOpenAiMessageKey(c, selectErr.StatusCode, key, params, selectErr.Code)
+					return
 				}
-				abortWithOpenAiMessage(c, selectErr.StatusCode, message, selectErr.Code)
+				if selectErr.MessageID != "" {
+					abortWithOpenAiMessageKey(c, selectErr.StatusCode, selectErr.MessageID, selectErr.Params, selectErr.Code)
+					return
+				}
+				abortWithOpenAiMessage(c, selectErr.StatusCode, selectErr.Message, selectErr.Code)
 				return
 			}
 		}
@@ -133,7 +136,8 @@ func Distribute() func(c *gin.Context) {
 // noAvailableChannelMessage explains a 503 for a task-plugin-claimed model.
 // The response tells the caller the model is plugin-claimed without naming the
 // plugin; the candidate plugin keys go to the server log under the request id.
-func noAvailableChannelMessage(c *gin.Context, group, modelName string) string {
+func noAvailableChannelMessageKey(c *gin.Context, group, modelName string) (string, map[string]any) {
+	params := map[string]any{"Group": group, "Model": modelName}
 	value, exists := c.Get(jsplugin.ContextKeyPinnedPlugin)
 	pinned, ok := value.(jsplugin.PinnedPlugin)
 	if exists && ok && pinned.Plugin != nil {
@@ -149,9 +153,9 @@ func noAvailableChannelMessage(c *gin.Context, group, modelName string) string {
 			}
 		}
 		logger.LogWarn(c, common.LogText("task_plugin subsystem=distribution event=no_available_channel group=%q model=%q plugins=%q reason=no_eligible_channel", group, modelName, strings.Join(keys, ",")))
-		return i18n.T(c, i18n.MsgDistributorNoAvailableChannelTaskPlugin, map[string]any{"Group": group, "Model": modelName})
+		return i18n.MsgDistributorNoAvailableChannelTaskPlugin, params
 	}
-	return i18n.T(c, i18n.MsgDistributorNoAvailableChannel, map[string]any{"Group": group, "Model": modelName})
+	return i18n.MsgDistributorNoAvailableChannel, params
 }
 
 func channelMatchesExpectedTaskPlugin(c *gin.Context, channel *model.Channel, expected string) bool {
