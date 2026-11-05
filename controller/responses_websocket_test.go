@@ -1040,7 +1040,8 @@ func TestResponsesHTTPHealthCountsFinalResult(t *testing.T) {
 			fixture.closeAndWait(t)
 			assert.Equal(t, int64(tc.attempts), attempts.Load())
 			if !tc.success {
-				assert.Equal(t, tc.firstStatus, response.StatusCode)
+				// Client status uses MapUpstreamErrorForClient (upstream 4xx → 502).
+				assert.Equal(t, service.MapUpstreamErrorStatusForClient(tc.firstStatus), response.StatusCode)
 			} else {
 				assert.Equal(t, http.StatusOK, response.StatusCode)
 			}
