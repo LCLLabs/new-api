@@ -49,6 +49,7 @@ func TestClassifyRelayOutcome(t *testing.T) {
 		})
 	}
 	assert.Equal(t, OutcomeIgnored, ClassifyRelayOutcome(context.Background(), &relaycommon.RelayInfo{PerformanceBusinessRejection: true}, nil))
+	assert.Equal(t, OutcomeIgnored, ClassifyRelayOutcome(canceled, &relaycommon.RelayInfo{IsStream: true}, nil))
 }
 
 func TestStreamOutcomeClassification(t *testing.T) {

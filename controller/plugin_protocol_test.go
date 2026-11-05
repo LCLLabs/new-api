@@ -1779,12 +1779,14 @@ func TestServeTaskPluginImageProtocolSubmissionErrorUsesOpenAIEnvelope(t *testin
 		return nil, service.TaskErrorWrapper(errors.New(`{"code":"InvalidParameter","message":"n must be 1","request_id":"r"}`), "fail_to_fetch_task", http.StatusBadRequest)
 	}
 	serveTaskPluginImageProtocol(c, pinned, deps)
-	require.Equal(t, http.StatusBadRequest, recorder.Code)
+	// Upstream/channel task failures are remapped for clients (4xx → 502);
+	// vendor code/message stay in the OpenAI error envelope.
+	require.Equal(t, http.StatusBadGateway, recorder.Code)
 	var response map[string]any
 	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &response))
 	errorBody := response["error"].(map[string]any)
 	assert.Equal(t, "InvalidParameter", errorBody["code"])
-	assert.Equal(t, "invalid_request_error", errorBody["type"])
+	assert.Equal(t, "new_api_error", errorBody["type"])
 	assert.Contains(t, errorBody["message"], "n must be 1")
 	assert.NotContains(t, errorBody["message"], "request_id")
 }
