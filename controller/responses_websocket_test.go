@@ -1040,7 +1040,8 @@ func TestResponsesHTTPHealthCountsFinalResult(t *testing.T) {
 			fixture.closeAndWait(t)
 			assert.Equal(t, int64(tc.attempts), attempts.Load())
 			if !tc.success {
-				// Client status uses MapUpstreamErrorForClient (upstream 4xx → 502).
+				// Client status uses MapUpstreamErrorForClient (401/403 → 502;
+				// validation 400/422 kept).
 				assert.Equal(t, service.MapUpstreamErrorStatusForClient(tc.firstStatus), response.StatusCode)
 			} else {
 				assert.Equal(t, http.StatusOK, response.StatusCode)
@@ -1396,7 +1397,7 @@ func TestResponsesWebSocketPreRoutingRejectionsFollowHealthClassification(t *tes
 		status  int
 		sampled bool
 	}{
-		{name: "no eligible channel", status: http.StatusServiceUnavailable, sampled: true, reject: func(t *testing.T, fixture *responsesWSBillingTest) {
+		{name: "no eligible channel", status: http.StatusNotFound, sampled: true, reject: func(t *testing.T, fixture *responsesWSBillingTest) {
 			require.NoError(t, model.DB.Model(&model.Ability{}).Where("channel_id = ?", fixture.channel.Id).Update("enabled", false).Error)
 		}},
 		{name: "token model limit", status: http.StatusForbidden, reject: func(t *testing.T, fixture *responsesWSBillingTest) {

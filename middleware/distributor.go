@@ -142,7 +142,7 @@ func Distribute() func(c *gin.Context) {
 	}
 }
 
-// noAvailableChannelMessageKey explains a 503 for a task-plugin-claimed model.
+// noAvailableChannelMessageKey explains a 404 for a task-plugin-claimed model.
 // The response tells the caller the model is plugin-claimed without naming the
 // plugin; the candidate plugin keys go to the server log under the request id.
 func noAvailableChannelMessageKey(c *gin.Context, group, modelName string) (string, map[string]any) {

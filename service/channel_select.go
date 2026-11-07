@@ -374,21 +374,23 @@ func SelectChannelForRequest(c *gin.Context, modelName string, retry *RetryParam
 			if usingGroup == "auto" {
 				showGroup = fmt.Sprintf("auto(%s)", selectGroup)
 			}
+			// Align with Anthropic/official gateways: an unknown or unroutable
+			// model is a client-fixable 404, not a transient 503 that SDKs retry.
 			return nil, selectGroup, &ChannelSelectError{
-				StatusCode: http.StatusServiceUnavailable, Code: types.ErrorCodeModelNotFound, MessageID: i18n.MsgDistributorGetChannelFailed,
+				StatusCode: http.StatusNotFound, Code: types.ErrorCodeModelNotFound, MessageID: i18n.MsgDistributorGetChannelFailed,
 				Params: map[string]any{"Group": showGroup, "Model": modelName, "Error": err.Error()},
 			}
 		}
 		if channel == nil {
 			return nil, selectGroup, &ChannelSelectError{
-				StatusCode: http.StatusServiceUnavailable, Code: types.ErrorCodeModelNotFound, MessageID: i18n.MsgDistributorNoAvailableChannel,
+				StatusCode: http.StatusNotFound, Code: types.ErrorCodeModelNotFound, MessageID: i18n.MsgDistributorNoAvailableChannel,
 				Params: map[string]any{"Group": usingGroup, "Model": modelName}, NoAvailableChannel: true,
 			}
 		}
 	}
 	if ok, kind := model.ChannelSatisfiesFilters(channel, modelName, constraints.Filters); !ok {
 		return nil, selectGroup, &ChannelSelectError{
-			StatusCode: http.StatusServiceUnavailable, Code: types.ErrorCodeModelNotFound, MessageID: i18n.MsgDistributorNoAvailableChannel,
+			StatusCode: http.StatusNotFound, Code: types.ErrorCodeModelNotFound, MessageID: i18n.MsgDistributorNoAvailableChannel,
 			Params:     map[string]any{"Group": common.GetContextKeyString(c, constant.ContextKeyUsingGroup), "Model": modelName},
 			FilterKind: kind, Channel: channel, NoAvailableChannel: true,
 		}
