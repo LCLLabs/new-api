@@ -103,9 +103,9 @@ func TestMapUpstreamErrorForClient(t *testing.T) {
 			wantStatus: http.StatusNotFound,
 		},
 		{
-			name:       "upstream 429 becomes 503",
+			name:       "upstream 429 stays 429",
 			err:        types.NewOpenAIError(fmt.Errorf("rate limited"), types.ErrorCodeBadResponseStatusCode, http.StatusTooManyRequests),
-			wantStatus: http.StatusServiceUnavailable,
+			wantStatus: http.StatusTooManyRequests,
 		},
 		{
 			name:       "upstream 408 becomes 504",
