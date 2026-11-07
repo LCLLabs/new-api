@@ -73,9 +73,9 @@ func TestMapUpstreamErrorForClient(t *testing.T) {
 		prepare    func(*types.NewAPIError)
 	}{
 		{
-			name:       "upstream 400 becomes 502",
+			name:       "upstream 400 stays 400",
 			err:        types.NewOpenAIError(fmt.Errorf("bad request"), types.ErrorCodeBadResponseStatusCode, http.StatusBadRequest),
-			wantStatus: http.StatusBadGateway,
+			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "upstream 401 becomes 502",
@@ -88,9 +88,19 @@ func TestMapUpstreamErrorForClient(t *testing.T) {
 			wantStatus: http.StatusBadGateway,
 		},
 		{
-			name:       "upstream 422 becomes 502",
+			name:       "upstream 422 stays 422",
 			err:        types.NewOpenAIError(fmt.Errorf("unprocessable"), types.ErrorCodeBadResponseStatusCode, http.StatusUnprocessableEntity),
-			wantStatus: http.StatusBadGateway,
+			wantStatus: http.StatusUnprocessableEntity,
+		},
+		{
+			name:       "upstream 404 stays 404",
+			err:        types.NewOpenAIError(fmt.Errorf("model not found"), types.ErrorCodeBadResponseStatusCode, http.StatusNotFound),
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "local model not found stays 404",
+			err:        types.NewErrorWithStatusCode(fmt.Errorf("no channel"), types.ErrorCodeModelNotFound, http.StatusNotFound),
+			wantStatus: http.StatusNotFound,
 		},
 		{
 			name:       "upstream 429 becomes 503",
@@ -133,10 +143,18 @@ func TestMapUpstreamErrorForClient(t *testing.T) {
 			wantStatus: http.StatusForbidden,
 		},
 		{
-			name: "status_code_mapping to 4xx still lifted to 502",
+			name: "status_code_mapping to validation 400 stays 400",
 			err:  types.NewOpenAIError(fmt.Errorf("upstream auth"), types.ErrorCodeBadResponseStatusCode, http.StatusUnauthorized),
 			prepare: func(err *types.NewAPIError) {
 				ResetStatusCode(err, `{"401":"400"}`)
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name: "status_code_mapping to non-validation 4xx still lifted to 502",
+			err:  types.NewOpenAIError(fmt.Errorf("upstream conflict"), types.ErrorCodeBadResponseStatusCode, http.StatusConflict),
+			prepare: func(err *types.NewAPIError) {
+				ResetStatusCode(err, `{"409":"409"}`)
 			},
 			wantStatus: http.StatusBadGateway,
 		},

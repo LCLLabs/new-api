@@ -183,8 +183,11 @@ func MapUpstreamTaskErrorForClient(taskErr *taskdto.TaskError) {
 }
 
 // MapUpstreamErrorStatusForClient maps an upstream HTTP status to the status
-// returned to API clients: timeouts to 504, rate limits to 503, other 4xx to
-// 502, and existing 5xx unchanged.
+// returned to API clients: timeouts to 504, rate limits to 503, auth/forbidden
+// 401/403 to 502 (channel credential failures must not look like the caller's
+// own token), while 400/404/422 stay as client-fixable errors so SDKs do not
+// retry them as server faults. Other 4xx and unknown failures become 502;
+// existing 5xx stay unchanged.
 func MapUpstreamErrorStatusForClient(statusCode int) int {
 	if statusCode >= 500 && statusCode <= 599 {
 		return statusCode
@@ -194,6 +197,10 @@ func MapUpstreamErrorStatusForClient(statusCode int) int {
 		return http.StatusGatewayTimeout
 	case http.StatusTooManyRequests:
 		return http.StatusServiceUnavailable
+	case http.StatusBadRequest, http.StatusNotFound, http.StatusUnprocessableEntity:
+		return statusCode
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return http.StatusBadGateway
 	default:
 		if statusCode >= 400 && statusCode <= 499 {
 			return http.StatusBadGateway
