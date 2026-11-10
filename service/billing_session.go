@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/i18n"
@@ -20,6 +21,30 @@ import (
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/gin-gonic/gin"
 )
+
+// pendingBillingRefunds tracks asynchronous BillingSession.Refund goroutines so
+// graceful shutdown can wait for ledger refunds to finish before exit.
+var pendingBillingRefunds sync.WaitGroup
+
+// WaitPendingBillingRefunds blocks until in-flight async refunds complete or
+// timeout elapses. A non-positive timeout returns immediately.
+func WaitPendingBillingRefunds(timeout time.Duration) {
+	if timeout <= 0 {
+		return
+	}
+	done := make(chan struct{})
+	go func() {
+		pendingBillingRefunds.Wait()
+		close(done)
+	}()
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-done:
+	case <-timer.C:
+		common.SysError(common.LogText("timed out waiting for pending billing refunds"))
+	}
+}
 
 // ---------------------------------------------------------------------------
 // BillingSession — 统一计费会话
@@ -109,7 +134,9 @@ func (s *BillingSession) Refund(c *gin.Context) {
 	subscriptionId := s.relayInfo.SubscriptionId
 	funding := s.funding
 
+	pendingBillingRefunds.Add(1)
 	gopool.Go(func() {
+		defer pendingBillingRefunds.Done()
 		// 1) 退还资金来源
 		if err := funding.Refund(); err != nil {
 			common.SysLog(common.LogText("error refunding billing source: %s", err.Error()))
