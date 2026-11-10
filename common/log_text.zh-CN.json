@@ -809,6 +809,7 @@
   "testing channel #%d, response: \n%s": "测试渠道 #%d，响应: \n%s",
   "testing channel %d with model %s , info %+v ": "测试渠道 %d，模型 %s，信息 %+v ",
   "text request body: %s": "文本请求体: %s",
+  "timed out waiting for pending billing refunds": "等待进行中的计费退款超时",
   "token quota cache reserve unavailable, falling back to database: %s": "无法在缓存中预扣令牌额度，改为直接扣数据库: %s",
   "tool surcharge call count clamped: tool=%s count=%d": "工具调用次数超出计费上限，按上限计费: tool=%s count=%d",
   "tool surcharge call count overflow for %s": "工具 %s 的计费调用次数溢出",

@@ -40,6 +40,13 @@ func InitBatchUpdater() {
 	})
 }
 
+// FlushBatchUpdates writes any pending batch-aggregated quota/stat deltas to the
+// database. Intended for graceful shutdown so in-memory BATCH_UPDATE maps are
+// not lost when the process exits.
+func FlushBatchUpdates() {
+	batchUpdate()
+}
+
 func addNewRecord(type_ int, id int, value int) {
 	batchUpdateLocks[type_].Lock()
 	defer batchUpdateLocks[type_].Unlock()
