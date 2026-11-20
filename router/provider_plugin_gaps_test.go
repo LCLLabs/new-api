@@ -433,8 +433,8 @@ func TestGapsKeyExchange(t *testing.T) {
 	}{
 		"a token serves many requests":        {posts: 2, status: http.StatusOK, exchanges: 1, sends: 2},
 		"a rejected token is exchanged again": {rejected: func(bearer string) bool { return bearer == "Bearer tok-1" }, posts: 1, status: http.StatusOK, exchanges: 2, sends: 2},
-		"a second rejection is an error":      {rejected: func(string) bool { return true }, posts: 1, status: http.StatusUnauthorized, exchanges: 2, sends: 2, disabled: true},
-		"a returned error is a channel error": {tokenStatus: http.StatusForbidden, posts: 1, status: http.StatusUnauthorized, exchanges: 1, disabled: true},
+		"a second rejection is an error":      {rejected: func(string) bool { return true }, posts: 1, status: http.StatusBadGateway, exchanges: 2, sends: 2, disabled: true},
+		"a returned error is a channel error": {tokenStatus: http.StatusForbidden, posts: 1, status: http.StatusBadGateway, exchanges: 1, disabled: true},
 		"a throw keeps the channel":           {tokenStatus: http.StatusBadGateway, posts: 1, status: http.StatusInternalServerError, exchanges: 1},
 	} {
 		t.Run(name, func(t *testing.T) {

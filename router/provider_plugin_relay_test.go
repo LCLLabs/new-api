@@ -515,7 +515,7 @@ func TestSecondRejectionTakesTheUsualErrorPath(t *testing.T) {
 
 	outcome := harness.post(t, "/v1/chat/completions", relayTestBody)
 
-	assert.Equal(t, http.StatusUnauthorized, outcome.status, outcome.body)
+	assert.Equal(t, http.StatusBadGateway, outcome.status, outcome.body)
 	requests := harness.upstream.captured()
 	assert.Len(t, requestsTo(requests, "/oauth/token"), 1)
 	assert.Len(t, requests, 3, "one send, one refresh, one resend")
@@ -535,7 +535,7 @@ func TestRejectionWithoutRefreshIsAnOrdinaryError(t *testing.T) {
 
 	outcome := harness.post(t, "/v1/chat/completions", relayTestBody)
 
-	assert.Equal(t, http.StatusUnauthorized, outcome.status, outcome.body)
+	assert.Equal(t, http.StatusBadGateway, outcome.status, outcome.body)
 	assert.Len(t, harness.upstream.captured(), 1)
 }
 

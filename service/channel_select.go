@@ -374,33 +374,64 @@ func SelectChannelForRequest(c *gin.Context, modelName string, retry *RetryParam
 	if channel == nil {
 		var err error
 		channel, selectGroup, err = CacheGetRandomSatisfiedChannel(retry)
+		showGroup := usingGroup
+		if usingGroup == "auto" {
+			showGroup = fmt.Sprintf("auto(%s)", selectGroup)
+		}
 		if err != nil {
-			showGroup := usingGroup
-			if usingGroup == "auto" {
-				showGroup = fmt.Sprintf("auto(%s)", selectGroup)
-			}
-			// Align with Anthropic/official gateways: an unknown or unroutable
-			// model is a client-fixable 404, not a transient 503 that SDKs retry.
 			return nil, selectGroup, &ChannelSelectError{
-				StatusCode: http.StatusNotFound, Code: types.ErrorCodeModelNotFound, MessageID: i18n.MsgDistributorGetChannelFailed,
+				StatusCode: http.StatusServiceUnavailable, Code: types.ErrorCodeModelNotFound, MessageID: i18n.MsgDistributorGetChannelFailed,
 				Params: map[string]any{"Group": showGroup, "Model": modelName, "Error": err.Error()},
 			}
 		}
 		if channel == nil {
+			// 404 only when none of the groups this request can use has the model
+			// configured. A configured model whose channels are disabled, filtered
+			// out, or otherwise unusable stays 503 so clients retry the outage.
+			configured, checkErr := groupsHaveChannelForModel(c, retry, modelName)
+			if checkErr != nil {
+				return nil, selectGroup, &ChannelSelectError{
+					StatusCode: http.StatusServiceUnavailable, Code: types.ErrorCodeModelNotFound, MessageID: i18n.MsgDistributorGetChannelFailed,
+					Params: map[string]any{"Group": showGroup, "Model": modelName, "Error": checkErr.Error()},
+				}
+			}
+			statusCode := http.StatusServiceUnavailable
+			if !configured {
+				statusCode = http.StatusNotFound
+			}
 			return nil, selectGroup, &ChannelSelectError{
-				StatusCode: http.StatusNotFound, Code: types.ErrorCodeModelNotFound, MessageID: i18n.MsgDistributorNoAvailableChannel,
+				StatusCode: statusCode, Code: types.ErrorCodeModelNotFound, MessageID: i18n.MsgDistributorNoAvailableChannel,
 				Params: map[string]any{"Group": usingGroup, "Model": modelName}, NoAvailableChannel: true,
 			}
 		}
 	}
 	if ok, kind := model.ChannelSatisfiesFilters(channel, modelName, constraints.Filters); !ok {
 		return nil, selectGroup, &ChannelSelectError{
-			StatusCode: http.StatusNotFound, Code: types.ErrorCodeModelNotFound, MessageID: i18n.MsgDistributorNoAvailableChannel,
+			StatusCode: http.StatusServiceUnavailable, Code: types.ErrorCodeModelNotFound, MessageID: i18n.MsgDistributorNoAvailableChannel,
 			Params:     map[string]any{"Group": common.GetContextKeyString(c, constant.ContextKeyUsingGroup), "Model": modelName},
 			FilterKind: kind, Channel: channel, NoAvailableChannel: true,
 		}
 	}
 	return channel, selectGroup, nil
+}
+
+// groupsHaveChannelForModel reports whether any group this request may search
+// has a channel configured for modelName, including disabled channels.
+func groupsHaveChannelForModel(c *gin.Context, retry *RetryParam, modelName string) (bool, error) {
+	groups := []string{retry.TokenGroup}
+	if retry.TokenGroup == "auto" {
+		groups = GetRequestAutoGroups(c, common.GetContextKeyString(c, constant.ContextKeyUserGroup))
+	}
+	for _, group := range groups {
+		found, err := model.GroupHasChannelForModel(group, modelName)
+		if err != nil {
+			return false, err
+		}
+		if found {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // Origin-task pins report a fixed code so task polling can tell a retired
