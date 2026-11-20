@@ -19,6 +19,7 @@ const (
 	outcomeTimeout       = "timeout"
 	outcomeAuth          = "auth"
 	outcomeUpstreamError = "upstream_error"
+	outcomeClientError   = "client_error"
 )
 
 var latencyBuckets = []float64{0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30, 60, 120, 300}
@@ -166,7 +167,8 @@ func ObserveUpstreamSuccess(channelID int) {
 
 // ObserveUpstreamFailure counts one failed upstream attempt. Any status outside
 // 2xx is a failure. skip drops client cancellation and business rejection.
-// Channel id 0 is not recorded.
+// Request statuses 400/404/405/409/413/415/422 are client_error, not upstream
+// failures. Channel id 0 is not recorded.
 func ObserveUpstreamFailure(channelID, statusCode int, timedOut, skip bool) {
 	mu.RLock()
 	inst := active
@@ -190,6 +192,14 @@ func upstreamFailureOutcome(statusCode int, timedOut bool) string {
 		return outcomeRateLimit
 	case statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden:
 		return outcomeAuth
+	case statusCode == http.StatusBadRequest ||
+		statusCode == http.StatusNotFound ||
+		statusCode == http.StatusMethodNotAllowed ||
+		statusCode == http.StatusConflict ||
+		statusCode == http.StatusRequestEntityTooLarge ||
+		statusCode == http.StatusUnsupportedMediaType ||
+		statusCode == http.StatusUnprocessableEntity:
+		return outcomeClientError
 	case statusCode >= 200 && statusCode < 300:
 		return ""
 	default:
