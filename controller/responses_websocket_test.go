@@ -1397,7 +1397,7 @@ func TestResponsesWebSocketPreRoutingRejectionsFollowHealthClassification(t *tes
 		status  int
 		sampled bool
 	}{
-		{name: "no eligible channel", status: http.StatusNotFound, sampled: true, reject: func(t *testing.T, fixture *responsesWSBillingTest) {
+		{name: "no eligible channel", status: http.StatusServiceUnavailable, sampled: true, reject: func(t *testing.T, fixture *responsesWSBillingTest) {
 			require.NoError(t, model.DB.Model(&model.Ability{}).Where("channel_id = ?", fixture.channel.Id).Update("enabled", false).Error)
 		}},
 		{name: "token model limit", status: http.StatusForbidden, reject: func(t *testing.T, fixture *responsesWSBillingTest) {

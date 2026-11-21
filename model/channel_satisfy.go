@@ -66,3 +66,38 @@ func isChannelEnabledForGroupModelDB(group string, modelName string, channelID i
 func isChannelIDInList(list []int, channelID int) bool {
 	return slices.Contains(list, channelID)
 }
+
+// GroupHasChannelForModel reports whether group has any channel configured for
+// modelName or its routing name, including channels that are currently disabled.
+// A false result is the unknown-model case. Selection errors and channels that
+// exist but cannot be used are a separate outcome.
+func GroupHasChannelForModel(group, modelName string) (bool, error) {
+	if group == "" || modelName == "" {
+		return false, nil
+	}
+	names := []string{modelName}
+	if normalized := ratio_setting.RoutingMatchModelName(modelName); normalized != "" && normalized != modelName {
+		names = append(names, normalized)
+	}
+	if !common.MemoryCacheEnabled {
+		var count int64
+		err := DB.Model(&Ability{}).
+			Where(commonGroupCol+" = ? AND model IN ?", group, names).
+			Count(&count).Error
+		return count > 0, err
+	}
+
+	channelSyncLock.RLock()
+	defer channelSyncLock.RUnlock()
+	for _, channel := range channelsIDM {
+		if channel == nil || !slices.Contains(channel.GetGroups(), group) {
+			continue
+		}
+		for _, configured := range channel.GetModels() {
+			if slices.Contains(names, configured) {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
