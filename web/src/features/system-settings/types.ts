@@ -402,6 +402,12 @@ export type OperationsSettings = {
   'perf_metrics_setting.retention_days': number
 }
 
+export type DistillSettings = {
+  DistillCheckGroups: string
+  DistillRules: string
+  DistillSkipOpenAI: boolean
+}
+
 export type SecuritySettings = {
   ModelRequestRateLimitEnabled: boolean
   ModelRequestRateLimitCount: number

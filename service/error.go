@@ -247,6 +247,7 @@ func isLocalClientFacingError(err *types.NewAPIError) bool {
 		types.ErrorCodeInsufficientUserQuota,
 		types.ErrorCodePreConsumeTokenQuotaFailed,
 		types.ErrorCodeSensitiveWordsDetected,
+		types.ErrorCodeDistillBlocked,
 		types.ErrorCodeAccessDenied,
 		types.ErrorCodeModelPriceError,
 		types.ErrorCodeInvalidApiType,

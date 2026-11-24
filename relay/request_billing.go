@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/QuantumNous/new-api/common"
@@ -34,6 +35,12 @@ func PrepareRequestBilling(c *gin.Context, info *relaycommon.RelayInfo) *types.N
 		case *dto.ImageRequest:
 			meta = request.GetTokenCountMeta()
 		}
+	}
+
+	if hit, rule := service.CheckDistill(info); hit {
+		service.RequestPolicy(c).AddEvent(service.PolicyEvent{ErrorCode: string(types.ErrorCodeDistillBlocked), ErrorSource: "local", Decision: service.PolicyDecision{Action: "stop", Reason: rule, Source: "global"}, Health: "unchanged"})
+		logger.LogWarn(c, common.LogText("distill blocked: %s", rule))
+		return types.NewErrorWithStatusCode(errors.New("不允许蒸馏"), types.ErrorCodeDistillBlocked, http.StatusForbidden)
 	}
 
 	tokens, err := service.EstimateRequestToken(c, meta, info)

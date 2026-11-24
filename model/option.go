@@ -182,6 +182,9 @@ func InitOptionMap() {
 	common.OptionMap["DemoSiteEnabled"] = strconv.FormatBool(operation_setting.DemoSiteEnabled)
 	common.OptionMap["SelfUseModeEnabled"] = strconv.FormatBool(operation_setting.SelfUseModeEnabled)
 	common.OptionMap["ModelRequestRateLimitEnabled"] = strconv.FormatBool(setting.ModelRequestRateLimitEnabled)
+	common.OptionMap["DistillCheckGroups"] = setting.DistillCheckGroupsJSON()
+	common.OptionMap["DistillRules"] = setting.DistillRulesJSON()
+	common.OptionMap["DistillSkipOpenAI"] = strconv.FormatBool(setting.DistillSkipOpenAI())
 	common.OptionMap["AutomaticDisableKeywords"] = operation_setting.AutomaticDisableKeywordsToString()
 	common.OptionMap["AutomaticDisableStatusCodes"] = operation_setting.AutomaticDisableStatusCodesToString()
 	common.OptionMap["AutomaticRetryStatusCodes"] = operation_setting.AutomaticRetryStatusCodesToString()
@@ -385,7 +388,7 @@ func UpdateOptionsBulk(values map[string]string) error {
 		}
 	}
 	if policySnapshot != nil {
-		requestPolicySnapshot.Store(policySnapshot)
+		storeRequestPolicy(policySnapshot)
 	}
 	return nil
 }

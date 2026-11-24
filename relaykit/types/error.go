@@ -43,6 +43,7 @@ const (
 	ErrorCodeRequestRejected        ErrorCode = "request_rejected"
 	ErrorCodeRequestPluginFailed    ErrorCode = "request_plugin_failed"
 	ErrorCodeResponseRejected       ErrorCode = "response_rejected"
+	ErrorCodeDistillBlocked         ErrorCode = "distill_blocked"
 	ErrorCodeViolationFeeGrokCSAM   ErrorCode = "violation_fee.grok.csam"
 
 	// new api error

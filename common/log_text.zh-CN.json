@@ -395,6 +395,7 @@
   "dashboard authentication error: %s": "控制台登录校验出错: %s",
   "data handler goroutine panic: %v": "数据处理 goroutine 发生 panic: %v",
   "database migration started": "开始数据库迁移",
+  "distill blocked: %s": "蒸馏检查已拦截: %s",
   "do request failed: %s": "请求上游失败: %s",
   "downloading file from worker: %s, reason: %s": "通过 Worker 下载文件: %s，原因: %s",
   "downloading from origin: %s, reason: %s": "直接从源地址下载: %s，原因: %s",
