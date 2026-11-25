@@ -24,11 +24,11 @@ import {
   FileText,
   FlaskConical,
   Key,
-  LayoutDashboard,
   ListTodo,
   MessageSquare,
   PlugZap,
   Radio,
+  Receipt,
   ServerCog,
   Settings,
   ShieldCheck,
@@ -77,12 +77,12 @@ export function useSidebarData(badges: SidebarBadges = {}): SidebarData {
           {
             title: t('Overview'),
             url: '/dashboard/overview',
+            activeUrls: [
+              '/dashboard/models',
+              '/dashboard/flow',
+              '/dashboard/users',
+            ],
             icon: Activity,
-          },
-          {
-            title: t('Dashboard'),
-            url: '/dashboard/models',
-            icon: LayoutDashboard,
           },
           {
             title: t('API Keys'),
@@ -116,6 +116,11 @@ export function useSidebarData(badges: SidebarBadges = {}): SidebarData {
             title: t('Wallet'),
             url: '/wallet',
             icon: Wallet,
+          },
+          {
+            title: t('Bill'),
+            url: '/bills',
+            icon: Receipt,
           },
           {
             title: t('Profile'),
