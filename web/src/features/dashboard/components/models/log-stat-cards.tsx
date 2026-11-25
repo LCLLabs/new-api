@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { IconBadge } from '@/components/ui/icon-badge'
@@ -26,6 +26,7 @@ import { useModelStatCardsConfig } from '@/features/dashboard/hooks/use-dashboar
 import {
   buildQueryParams,
   calculateDashboardStats,
+  filterQuotaByModels,
   getDefaultDays,
 } from '@/features/dashboard/lib'
 import type {
@@ -63,15 +64,17 @@ export function LogStatCards(props: LogStatCardsProps) {
   const statCardsConfig = useModelStatCardsConfig()
   const user = useAuthStore((state) => state.auth.user)
   const isAdmin = !!(user?.role && user.role >= 10)
-  const [stats, setStats] = useState<ReturnType<
-    typeof calculateDashboardStats
-  > | null>(null)
+  const [rows, setRows] = useState<QuotaDataItem[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
   const [timeRangeMinutes, setTimeRangeMinutes] = useState(0)
 
   const { filters, onDataUpdate } = props
+  const startTimestamp = filters?.start_timestamp?.getTime()
+  const endTimestamp = filters?.end_timestamp?.getTime()
+  const granularity = filters?.time_granularity
+  const username = filters?.username
 
   useEffect(() => {
     const abortController = new AbortController()
@@ -79,26 +82,33 @@ export function LogStatCards(props: LogStatCardsProps) {
     setLoading(true)
 
     setError(false)
+    setRows(null)
     onDataUpdate?.([], true)
 
     const timeRange = computeTimeRange(
-      getDefaultDays(filters?.time_granularity),
-      filters?.start_timestamp,
-      filters?.end_timestamp
+      getDefaultDays(granularity),
+      startTimestamp === undefined ? undefined : new Date(startTimestamp),
+      endTimestamp === undefined ? undefined : new Date(endTimestamp)
     )
     const timeDiff = (timeRange.end_timestamp - timeRange.start_timestamp) / 60
     setTimeRangeMinutes(timeDiff)
 
-    void getUserQuotaDates(buildQueryParams(timeRange, filters), isAdmin)
+    void getUserQuotaDates(
+      buildQueryParams(timeRange, {
+        time_granularity: granularity,
+        username,
+      }),
+      isAdmin
+    )
       .then((res) => {
         if (abortController.signal.aborted) return
         const data = res?.data || []
-        setStats(calculateDashboardStats(data))
+        setRows(data)
         onDataUpdate?.(data, false)
       })
       .catch(() => {
         if (abortController.signal.aborted) return
-        setStats(null)
+        setRows(null)
         setError(true)
         onDataUpdate?.([], false)
       })
@@ -111,7 +121,20 @@ export function LogStatCards(props: LogStatCardsProps) {
     return () => {
       abortController.abort()
     }
-  }, [filters, isAdmin, onDataUpdate])
+  }, [
+    endTimestamp,
+    granularity,
+    isAdmin,
+    onDataUpdate,
+    startTimestamp,
+    username,
+  ])
+
+  const visibleRows = useMemo(
+    () => filterQuotaByModels(rows ?? [], filters?.model_names),
+    [filters?.model_names, rows]
+  )
+  const stats = rows === null ? null : calculateDashboardStats(visibleRows)
 
   const adaptedStats = {
     rpm: stats?.totalCount ?? 0,

@@ -30,6 +30,7 @@ import type {
   DashboardChartPreferences,
   DashboardFilters,
   ModelAnalyticsChartTab,
+  QuotaDataItem,
 } from '@/features/dashboard/types'
 import { getRollingDateRange, type TimeGranularity } from '@/lib/time'
 
@@ -150,6 +151,15 @@ export function buildDefaultDashboardFilters(
     end_timestamp: end,
     time_granularity: preferences.defaultTimeGranularity,
   }
+}
+
+export function filterQuotaByModels(
+  data: QuotaDataItem[],
+  modelNames: string[] | undefined
+): QuotaDataItem[] {
+  if (!modelNames) return data
+  const selected = new Set(modelNames)
+  return data.filter((item) => selected.has(item.model_name ?? ''))
 }
 
 export function buildQueryParams(

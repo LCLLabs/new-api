@@ -37,10 +37,11 @@ import { useAuthStore } from '@/stores/auth-store'
 
 import { ModelsChartPreferences } from './components/models/models-chart-preferences'
 import { ModelsFilter } from './components/models/models-filter-dialog'
-import { OverviewDashboard } from './components/overview/overview-dashboard'
+import { SummaryCards } from './components/overview/summary-cards'
 import { DEFAULT_TIME_GRANULARITY } from './constants'
 import {
   buildDefaultDashboardFilters,
+  filterQuotaByModels,
   getDefaultDays,
   getSavedChartPreferences,
   getSavedGranularity,
@@ -238,6 +239,17 @@ export function Dashboard() {
     },
     []
   )
+  const availableModelNames = useMemo(() => {
+    const names = new Set<string>()
+    for (const item of modelData) {
+      if (item.model_name) names.add(item.model_name)
+    }
+    return [...names].sort((left, right) => left.localeCompare(right))
+  }, [modelData])
+  const filteredModelData = useMemo(
+    () => filterQuotaByModels(modelData, modelFilters.model_names),
+    [modelData, modelFilters.model_names]
+  )
 
   const handleChartPreferencesChange = useCallback(
     (preferences: DashboardChartPreferences) => {
@@ -252,9 +264,11 @@ export function Dashboard() {
   const isAdmin = Boolean(userRole && userRole >= ROLE.ADMIN)
   const visibleSections = useMemo(
     () =>
-      DASHBOARD_SECTION_IDS.filter(
-        (section) => section !== 'overview' && (section !== 'users' || isAdmin)
-      ),
+      DASHBOARD_SECTION_IDS.filter((section) => {
+        if (section === 'models') return false
+        if (section === 'flow' || section === 'users') return isAdmin
+        return true
+      }),
     [isAdmin]
   )
   const handleSectionChange = useCallback(
@@ -266,23 +280,23 @@ export function Dashboard() {
     },
     [navigate]
   )
-  const showSectionTabs =
-    activeSection !== 'overview' && visibleSections.length > 1
-  const modelActions =
-    activeSection === 'models' ? (
-      <>
-        <ModelsChartPreferences
-          preferences={chartPreferences}
-          onPreferencesChange={handleChartPreferencesChange}
-        />
+  const showSectionTabs = visibleSections.length > 1
+  const showModelAnalytics = activeSection === 'overview'
+  const modelActions = showModelAnalytics ? (
+    <>
+      <ModelsChartPreferences
+        preferences={chartPreferences}
+        onPreferencesChange={handleChartPreferencesChange}
+      />
         <ModelsFilter
           preferences={chartPreferences}
           currentFilters={modelFilters}
+          modelNames={dataLoading ? undefined : availableModelNames}
           onFilterChange={handleFilterChange}
           onReset={handleResetFilters}
         />
-      </>
-    ) : null
+    </>
+  ) : null
   const flowActions =
     activeSection === 'flow' ? (
       <>
@@ -321,37 +335,60 @@ export function Dashboard() {
       </>
     ) : null
   const sectionActions = modelActions ?? flowActions
-
-  if (activeSection === 'overview') {
-    return <OverviewDashboard />
+  let sectionNav = <div />
+  if (showModelAnalytics) {
+    sectionNav = (
+      <div className='flex min-w-0 flex-wrap items-center gap-1'>
+        <h3 className='px-1 text-sm font-semibold'>
+          {t('Model Call Analytics')}
+        </h3>
+        {visibleSections
+          .filter((section) => section !== 'overview')
+          .map((section) => (
+            <Button
+              key={section}
+              variant='ghost'
+              size='sm'
+              onClick={() => handleSectionChange(section)}
+            >
+              {t(SECTION_META[section].titleKey)}
+            </Button>
+          ))}
+      </div>
+    )
+  } else if (showSectionTabs) {
+    sectionNav = (
+      <Tabs value={activeSection} onValueChange={handleSectionChange}>
+        <TabsList className='max-w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto'>
+          {visibleSections.map((section) => (
+            <TabsTrigger key={section} value={section}>
+              {section === 'overview'
+                ? t('Model Call Analytics')
+                : t(SECTION_META[section].titleKey)}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+    )
   }
 
   return (
     <SectionPageLayout>
-      <SectionPageLayout.Title>{t(meta.titleKey)}</SectionPageLayout.Title>
+      <SectionPageLayout.Title>
+        {showModelAnalytics ? t('Overview') : t(meta.titleKey)}
+      </SectionPageLayout.Title>
       <SectionPageLayout.Content>
         <div className='space-y-3 sm:space-y-4'>
+          {showModelAnalytics ? <SummaryCards /> : null}
           <div className='flex flex-wrap items-center justify-between gap-1.5 sm:gap-2'>
-            {showSectionTabs ? (
-              <Tabs value={activeSection} onValueChange={handleSectionChange}>
-                <TabsList className='max-w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto'>
-                  {visibleSections.map((section) => (
-                    <TabsTrigger key={section} value={section}>
-                      {t(SECTION_META[section].titleKey)}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
-            ) : (
-              <div />
-            )}
+            {sectionNav}
             {sectionActions != null && (
               <div className='flex shrink-0 flex-wrap items-center gap-1.5 sm:gap-2'>
                 {sectionActions}
               </div>
             )}
           </div>
-          {activeSection === 'models' && (
+          {showModelAnalytics && (
             <>
               <FadeIn>
                 <Suspense fallback={<LogStatCardsFallback />}>
@@ -371,7 +408,7 @@ export function Dashboard() {
               <FadeIn delay={0.1}>
                 <Suspense fallback={<ModelChartsFallback />}>
                   <LazyConsumptionDistributionChart
-                    data={modelData}
+                    data={filteredModelData}
                     loading={dataLoading}
                     defaultChartType={
                       chartPreferences.consumptionDistributionChart
@@ -385,7 +422,7 @@ export function Dashboard() {
               <FadeIn delay={0.15}>
                 <Suspense fallback={<ModelChartsFallback />}>
                   <LazyModelCharts
-                    data={modelData}
+                    data={filteredModelData}
                     loading={dataLoading}
                     defaultChartTab={chartPreferences.modelAnalyticsChart}
                     timeGranularity={
