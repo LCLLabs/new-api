@@ -134,7 +134,8 @@ export function BillTable(props: {
       id: 'discount',
       header: t('Discount coefficient'),
       className: 'text-right',
-      cell: (row: BillDetail) => formatBillDiscount(row.discount, locale),
+      cell: (row: BillDetail) =>
+        formatBillDiscount(row.discount, locale, row.dynamic, t),
     },
     {
       id: 'actual',
@@ -158,6 +159,8 @@ export function BillTable(props: {
             row.token_id,
             row.token_name,
             row.group,
+            row.dynamic ? 'dynamic' : 'ratio',
+            row.discount ?? 'none',
           ].join(':')
         }
         empty={props.rows.length === 0}

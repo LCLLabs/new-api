@@ -8,6 +8,7 @@
     "Cannot clear the root redirect URL while root redirect is enabled.": "Impossible d’effacer l’URL de redirection tant que la redirection de la racine est activée.",
     "Cannot enable root redirect. Enter a valid absolute HTTP(S) redirect URL first.": "Impossible d’activer la redirection de la racine. Saisissez d’abord une URL HTTP(S) absolue valide.",
     "Combined": "Agrégé",
+    "Dynamic billing × {{ratio}}": "Facturation dynamique × {{ratio}}",
     "Enter a redirect URL before enabling root path redirect": "Saisissez une URL de redirection avant d’activer la redirection de la racine",
     "Enter an absolute HTTP(S) URL without credentials": "Saisissez une URL HTTP(S) absolue sans identifiants",
     "Redirect root path": "Rediriger la racine",

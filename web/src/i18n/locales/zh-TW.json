@@ -8,6 +8,7 @@
     "Cannot clear the root redirect URL while root redirect is enabled.": "根路徑導向已啟用時，無法清空導向 URL。",
     "Cannot enable root redirect. Enter a valid absolute HTTP(S) redirect URL first.": "無法啟用根路徑導向，請先填寫有效的絕對 HTTP(S) 導向 URL。",
     "Combined": "匯總",
+    "Dynamic billing × {{ratio}}": "動態計費×{{ratio}}",
     "Enter a redirect URL before enabling root path redirect": "啟用根路徑導向前請先填寫導向 URL",
     "Enter an absolute HTTP(S) URL without credentials": "請輸入不含憑證的絕對 HTTP(S) URL",
     "Redirect root path": "根路徑導向",

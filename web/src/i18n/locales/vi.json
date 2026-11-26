@@ -8,6 +8,7 @@
     "Cannot clear the root redirect URL while root redirect is enabled.": "Không thể xóa URL chuyển hướng khi chuyển hướng gốc đang bật.",
     "Cannot enable root redirect. Enter a valid absolute HTTP(S) redirect URL first.": "Không thể bật chuyển hướng gốc. Hãy nhập URL HTTP(S) tuyệt đối hợp lệ trước.",
     "Combined": "Tổng hợp",
+    "Dynamic billing × {{ratio}}": "Tính phí động × {{ratio}}",
     "Enter a redirect URL before enabling root path redirect": "Nhập URL chuyển hướng trước khi bật chuyển hướng đường dẫn gốc",
     "Enter an absolute HTTP(S) URL without credentials": "Nhập URL HTTP(S) tuyệt đối không kèm thông tin xác thực",
     "Redirect root path": "Chuyển hướng đường dẫn gốc",

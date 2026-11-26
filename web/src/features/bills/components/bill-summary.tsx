@@ -22,7 +22,6 @@ import { getLobeIcon } from '@/lib/lobe-icon'
 
 import {
   billLocale,
-  formatBillDiscount,
   formatBillQuota,
   formatBillTokens,
 } from '../lib/format'
@@ -76,12 +75,6 @@ function MetricLine(props: {
           </span>
         </span>
       ))}
-      <span className='inline-flex items-baseline gap-1'>
-        <span className='text-muted-foreground'>{t('Discount coefficient')}</span>
-        <span className='text-foreground font-medium tabular-nums'>
-          {formatBillDiscount(props.metrics.discount, props.locale)}
-        </span>
-      </span>
     </div>
   )
 }

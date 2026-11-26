@@ -73,24 +73,69 @@ func TestBuildUserBillGroupsRatioUsageAndRefunds(t *testing.T) {
 	assert.Equal(t, []string{"default"}, bill.Facets.Groups)
 }
 
-func TestBuildUserBillLeavesPriceBlankWhenDiscountsDiffer(t *testing.T) {
+func TestBuildUserBillSumsListPriceWhenDiscountsDiffer(t *testing.T) {
 	bill := BuildUserBill([]BillSource{
 		{Type: LogTypeConsume, ModelName: "m", TokenName: "a", Group: "g", Quota: 100, Other: `{"group_ratio":1}`},
 		{Type: LogTypeConsume, ModelName: "m", TokenName: "a", Group: "g", Quota: 100, Other: `{"group_ratio":0.5}`},
 	}, nil, BillFilter{})
 
-	assert.Nil(t, bill.Total.ListQuota)
+	require.Len(t, bill.Rows, 2)
+	assert.InDelta(t, 0.5, *bill.Rows[0].Discount, 0.000001)
+	assert.Equal(t, int64(200), *bill.Rows[0].ListQuota)
+	assert.InDelta(t, 1, *bill.Rows[1].Discount, 0.000001)
+	assert.Equal(t, int64(100), *bill.Rows[1].ListQuota)
+	require.NotNil(t, bill.Total.ListQuota)
+	assert.Equal(t, int64(300), *bill.Total.ListQuota)
 	assert.Nil(t, bill.Total.Discount)
+	assert.False(t, bill.Total.Dynamic)
 	assert.Equal(t, int64(200), bill.Total.ActualQuota)
 }
 
-func TestBuildUserBillLeavesPriceBlankForTieredTaskAndFixedPrice(t *testing.T) {
+func TestBuildUserBillPricesTieredExprFromGroupRatioOnly(t *testing.T) {
+	bill := BuildUserBill([]BillSource{
+		{
+			Type:      LogTypeConsume,
+			ModelName: "m",
+			Quota:     80,
+			Other:     `{"group_ratio":0.8,"user_group_ratio":-1,"billing_mode":"tiered_expr"}`,
+		},
+		{
+			Type:      LogTypeRefund,
+			ModelName: "m",
+			Quota:     40,
+			Other:     `{"group_ratio":0.8,"user_group_ratio":0.8,"billing_mode":"tiered_expr"}`,
+		},
+	}, nil, BillFilter{})
+
+	assert.Equal(t, int64(40), bill.Total.ActualQuota)
+	require.NotNil(t, bill.Total.ListQuota)
+	assert.Equal(t, int64(50), *bill.Total.ListQuota)
+	require.NotNil(t, bill.Total.Discount)
+	assert.InDelta(t, 0.8, *bill.Total.Discount, 0.000001)
+	assert.True(t, bill.Total.Dynamic)
+}
+
+func TestBuildUserBillIgnoresNegativeSentinelOnRatioBilling(t *testing.T) {
+	bill := BuildUserBill([]BillSource{{
+		Type: LogTypeConsume, ModelName: "m", Quota: 80,
+		Other: `{"group_ratio":0.8,"user_group_ratio":-1,"model_price":0.02}`,
+	}}, nil, BillFilter{})
+
+	assert.Equal(t, int64(80), bill.Total.ActualQuota)
+	require.NotNil(t, bill.Total.ListQuota)
+	assert.Equal(t, int64(100), *bill.Total.ListQuota)
+	require.NotNil(t, bill.Total.Discount)
+	assert.InDelta(t, 0.8, *bill.Total.Discount, 0.000001)
+	assert.False(t, bill.Total.Dynamic)
+}
+
+func TestBuildUserBillLeavesPriceBlankForInvalidRatio(t *testing.T) {
 	cases := []string{
-		`{"group_ratio":1,"billing_mode":"tiered_expr"}`,
-		`{"group_ratio":1,"model_price":0.02}`,
-		`{"group_ratio":1,"is_task":true}`,
-		`{"group_ratio":1,"tool_surcharges":[{"name":"search","count":1}]}`,
-		`{"group_ratio":1,"audio_input_seperate_price":true}`,
+		`{"group_ratio":0,"billing_mode":"tiered_expr"}`,
+		`{"group_ratio":-1}`,
+		`{"group_ratio":1,"user_group_ratio":0}`,
+		`{"group_ratio":1,"user_group_ratio":-2}`,
+		`{}`,
 	}
 	for _, other := range cases {
 		bill := BuildUserBill([]BillSource{{
@@ -98,7 +143,7 @@ func TestBuildUserBillLeavesPriceBlankForTieredTaskAndFixedPrice(t *testing.T) {
 		}}, nil, BillFilter{})
 		assert.Nil(t, bill.Total.Discount, other)
 		assert.Nil(t, bill.Total.ListQuota, other)
-		assert.Equal(t, int64(80), bill.Total.ActualQuota)
+		assert.Equal(t, int64(80), bill.Total.ActualQuota, other)
 	}
 }
 

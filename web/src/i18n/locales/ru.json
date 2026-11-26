@@ -8,6 +8,7 @@
     "Cannot clear the root redirect URL while root redirect is enabled.": "Нельзя очистить URL перенаправления, пока включено перенаправление корня.",
     "Cannot enable root redirect. Enter a valid absolute HTTP(S) redirect URL first.": "Нельзя включить перенаправление корня. Сначала укажите действительный абсолютный HTTP(S) URL.",
     "Combined": "Сводка",
+    "Dynamic billing × {{ratio}}": "Динамическая тарификация × {{ratio}}",
     "Enter a redirect URL before enabling root path redirect": "Перед включением перенаправления корня укажите URL",
     "Enter an absolute HTTP(S) URL without credentials": "Введите абсолютный HTTP(S) URL без учётных данных",
     "Redirect root path": "Перенаправлять корневой путь",

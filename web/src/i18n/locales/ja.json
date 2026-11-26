@@ -8,6 +8,7 @@
     "Cannot clear the root redirect URL while root redirect is enabled.": "ルートパスリダイレクトが有効な間は、リダイレクト URL を空にできません。",
     "Cannot enable root redirect. Enter a valid absolute HTTP(S) redirect URL first.": "ルートパスリダイレクトを有効にできません。先に有効な絶対 HTTP(S) URL を入力してください。",
     "Combined": "合算",
+    "Dynamic billing × {{ratio}}": "動的課金×{{ratio}}",
     "Enter a redirect URL before enabling root path redirect": "ルートパスリダイレクトを有効にする前に URL を入力してください",
     "Enter an absolute HTTP(S) URL without credentials": "認証情報を含まない絶対 HTTP(S) URL を入力してください",
     "Redirect root path": "ルートパスをリダイレクト",

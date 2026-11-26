@@ -27,6 +27,7 @@ export type BillMetrics = {
   actual_quota: number
   list_quota?: number
   discount?: number
+  dynamic?: boolean
 }
 
 export type BillVendorTotal = BillMetrics & {
