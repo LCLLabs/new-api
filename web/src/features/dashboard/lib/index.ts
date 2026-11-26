@@ -25,7 +25,6 @@ export {
   getSavedChartPreferences,
   saveChartPreferences,
   buildDefaultDashboardFilters,
-  filterQuotaByModels,
 } from './filters'
 export {
   getLatencyColorClass,

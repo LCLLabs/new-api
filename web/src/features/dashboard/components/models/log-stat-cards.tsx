@@ -26,7 +26,6 @@ import { useModelStatCardsConfig } from '@/features/dashboard/hooks/use-dashboar
 import {
   buildQueryParams,
   calculateDashboardStats,
-  filterQuotaByModels,
   getDefaultDays,
 } from '@/features/dashboard/lib'
 import type {
@@ -41,6 +40,12 @@ import { useAuthStore } from '@/stores/auth-store'
 
 interface LogStatCardsProps {
   filters?: DashboardFilters
+  // When set, render these rows and do not fetch. The parent already loaded them.
+  rows?: QuotaDataItem[]
+  loading?: boolean
+  error?: boolean
+  // Fetch for the parent without rendering the aggregate cards.
+  headless?: boolean
   onDataUpdate?: (data: QuotaDataItem[], loading: boolean) => void
 }
 
@@ -64,34 +69,37 @@ export function LogStatCards(props: LogStatCardsProps) {
   const statCardsConfig = useModelStatCardsConfig()
   const user = useAuthStore((state) => state.auth.user)
   const isAdmin = !!(user?.role && user.role >= 10)
-  const [rows, setRows] = useState<QuotaDataItem[] | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
-
-  const [timeRangeMinutes, setTimeRangeMinutes] = useState(0)
+  const [fetchedRows, setFetchedRows] = useState<QuotaDataItem[] | null>(null)
+  const [fetchLoading, setFetchLoading] = useState(true)
+  const [fetchError, setFetchError] = useState(false)
 
   const { filters, onDataUpdate } = props
+  const controlled = props.rows !== undefined
   const startTimestamp = filters?.start_timestamp?.getTime()
   const endTimestamp = filters?.end_timestamp?.getTime()
   const granularity = filters?.time_granularity
   const username = filters?.username
+  const timeRange = useMemo(
+    () =>
+      computeTimeRange(
+        getDefaultDays(granularity),
+        startTimestamp === undefined ? undefined : new Date(startTimestamp),
+        endTimestamp === undefined ? undefined : new Date(endTimestamp)
+      ),
+    [endTimestamp, granularity, startTimestamp]
+  )
+  const timeRangeMinutes =
+    (timeRange.end_timestamp - timeRange.start_timestamp) / 60
 
   useEffect(() => {
+    if (controlled) return
     const abortController = new AbortController()
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true)
+    setFetchLoading(true)
 
-    setError(false)
-    setRows(null)
+    setFetchError(false)
+    setFetchedRows(null)
     onDataUpdate?.([], true)
-
-    const timeRange = computeTimeRange(
-      getDefaultDays(granularity),
-      startTimestamp === undefined ? undefined : new Date(startTimestamp),
-      endTimestamp === undefined ? undefined : new Date(endTimestamp)
-    )
-    const timeDiff = (timeRange.end_timestamp - timeRange.start_timestamp) / 60
-    setTimeRangeMinutes(timeDiff)
 
     void getUserQuotaDates(
       buildQueryParams(timeRange, {
@@ -103,18 +111,18 @@ export function LogStatCards(props: LogStatCardsProps) {
       .then((res) => {
         if (abortController.signal.aborted) return
         const data = res?.data || []
-        setRows(data)
+        setFetchedRows(data)
         onDataUpdate?.(data, false)
       })
       .catch(() => {
         if (abortController.signal.aborted) return
-        setRows(null)
-        setError(true)
+        setFetchedRows(null)
+        setFetchError(true)
         onDataUpdate?.([], false)
       })
       .finally(() => {
         if (!abortController.signal.aborted) {
-          setLoading(false)
+          setFetchLoading(false)
         }
       })
 
@@ -122,19 +130,23 @@ export function LogStatCards(props: LogStatCardsProps) {
       abortController.abort()
     }
   }, [
+    controlled,
     endTimestamp,
     granularity,
     isAdmin,
     onDataUpdate,
     startTimestamp,
+    timeRange,
     username,
   ])
 
-  const visibleRows = useMemo(
-    () => filterQuotaByModels(rows ?? [], filters?.model_names),
-    [filters?.model_names, rows]
-  )
-  const stats = rows === null ? null : calculateDashboardStats(visibleRows)
+  const sourceRows = controlled ? (props.rows ?? []) : fetchedRows
+  const loading = controlled ? Boolean(props.loading) : fetchLoading
+  const error = controlled ? Boolean(props.error) : fetchError
+  const stats =
+    sourceRows === null ? null : calculateDashboardStats(sourceRows)
+
+  if (props.headless) return null
 
   const adaptedStats = {
     rpm: stats?.totalCount ?? 0,
