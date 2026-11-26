@@ -27,6 +27,7 @@ services:
     volumes:
       - dev_data:/data
     environment:
+      - METRICS_TOKEN=${METRICS_TOKEN}
       - SQL_DSN=postgresql://root:123456@postgres:5432/new-api
       - REDIS_CONN_STRING=redis://redis
       - TZ=Asia/Shanghai

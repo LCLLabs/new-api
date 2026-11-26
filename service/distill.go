@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"regexp"
 	"strings"
+	"unicode"
 
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/dto"
@@ -29,6 +30,7 @@ type distillPrompt struct {
 	system string
 	user   string
 	joined string
+	parts  []string
 }
 
 type distillShape struct {
@@ -77,6 +79,15 @@ func CheckDistill(info *relaycommon.RelayInfo) (bool, string) {
 	}
 	// CotPatterns use the same latest-user window as the five catalogs above.
 	if matchPattern(prompt.joined, rules.CotPatterns) {
+		return true, distillRuleCot
+	}
+	// Keep message boundaries intact while removing whitespace between Han
+	// characters. The original text is matched first for custom patterns.
+	normalized := make([]string, len(prompt.parts))
+	for i, part := range prompt.parts {
+		normalized[i] = removeHanWhitespace(part)
+	}
+	if matchPattern(strings.Join(normalized, "\n"), rules.CotPatterns) {
 		return true, distillRuleCot
 	}
 	return false, ""
@@ -275,7 +286,31 @@ func joinPrompt(systems, users []string) distillPrompt {
 	}
 	parts := append(append([]string{}, systems...), user)
 	parts = compact(parts)
-	return distillPrompt{system: strings.Join(systems, "\n"), user: user, joined: strings.Join(parts, "\n")}
+	return distillPrompt{system: strings.Join(systems, "\n"), user: user, joined: strings.Join(parts, "\n"), parts: parts}
+}
+
+// removeHanWhitespace removes whitespace only when both adjacent characters
+// are Han, leaving English word boundaries and the original request intact.
+func removeHanWhitespace(text string) string {
+	runes := []rune(text)
+	var out strings.Builder
+	out.Grow(len(text))
+	for i := 0; i < len(runes); {
+		if !unicode.IsSpace(runes[i]) {
+			out.WriteRune(runes[i])
+			i++
+			continue
+		}
+		start := i
+		for i < len(runes) && unicode.IsSpace(runes[i]) {
+			i++
+		}
+		if start > 0 && i < len(runes) && unicode.Is(unicode.Han, runes[start-1]) && unicode.Is(unicode.Han, runes[i]) {
+			continue
+		}
+		out.WriteString(string(runes[start:i]))
+	}
+	return out.String()
 }
 
 func compact(items []string) []string {

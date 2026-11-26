@@ -39,7 +39,26 @@ func PrepareRequestBilling(c *gin.Context, info *relaycommon.RelayInfo) *types.N
 
 	if hit, rule := service.CheckDistill(info); hit {
 		service.RequestPolicy(c).AddEvent(service.PolicyEvent{ErrorCode: string(types.ErrorCodeDistillBlocked), ErrorSource: "local", Decision: service.PolicyDecision{Action: "stop", Reason: rule, Source: "global"}, Health: "unchanged"})
-		logger.LogWarn(c, common.LogText("distill blocked: %s", rule))
+		event, err := common.Marshal(struct {
+			Event     string `json:"event"`
+			UserID    int    `json:"user_id"`
+			Rule      string `json:"rule"`
+			RequestID string `json:"request_id"`
+			EventID   string `json:"event_id"`
+		}{
+			Event:     string(types.ErrorCodeDistillBlocked),
+			UserID:    info.UserId,
+			Rule:      rule,
+			RequestID: info.RequestId,
+			EventID:   common.NewRequestId(),
+		})
+		message := common.LogText("distill blocked: %s", rule)
+		if err != nil {
+			message += " | " + common.LogText("failed to encode distill event: %s", err.Error())
+		} else {
+			message += " | DISTILL_EVENT " + string(event)
+		}
+		logger.LogWarn(c, message)
 		return types.NewErrorWithStatusCode(errors.New("不允许蒸馏"), types.ErrorCodeDistillBlocked, http.StatusForbidden)
 	}
 
