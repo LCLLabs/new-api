@@ -31,6 +31,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { getLobeIcon } from '@/lib/lobe-icon'
+import { resolveModelProvider } from '@/lib/model-provider'
 import { ROLE } from '@/lib/roles'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
@@ -41,7 +43,6 @@ import { SummaryCards } from './components/overview/summary-cards'
 import { DEFAULT_TIME_GRANULARITY } from './constants'
 import {
   buildDefaultDashboardFilters,
-  filterQuotaByModels,
   getDefaultDays,
   getSavedChartPreferences,
   getSavedGranularity,
@@ -223,6 +224,9 @@ export function Dashboard() {
     }
   )
   const [flowSensitiveVisible, setFlowSensitiveVisible] = useState(true)
+  const [vendorLayout, setVendorLayout] = useState<'split' | 'combined'>(
+    'combined'
+  )
 
   const handleFilterChange = useCallback((filters: DashboardFilters) => {
     setModelFilters(filters)
@@ -239,17 +243,37 @@ export function Dashboard() {
     },
     []
   )
-  const availableModelNames = useMemo(() => {
-    const names = new Set<string>()
+  const vendorSections = useMemo(() => {
+    const groups = new Map<
+      string,
+      {
+        id: string
+        label: string
+        icon?: string
+        rows: QuotaDataItem[]
+        quota: number
+      }
+    >()
     for (const item of modelData) {
-      if (item.model_name) names.add(item.model_name)
+      const provider = resolveModelProvider(item.model_name ?? '')
+      const id = provider?.name ?? 'unassigned'
+      const section = groups.get(id) ?? {
+        id,
+        label: provider ? (provider.label ?? provider.name) : t('Unassigned'),
+        icon: provider?.icon,
+        rows: [],
+        quota: 0,
+      }
+      section.rows.push(item)
+      section.quota += Number(item.quota) || 0
+      groups.set(id, section)
     }
-    return [...names].sort((left, right) => left.localeCompare(right))
-  }, [modelData])
-  const filteredModelData = useMemo(
-    () => filterQuotaByModels(modelData, modelFilters.model_names),
-    [modelData, modelFilters.model_names]
-  )
+    return [...groups.values()].sort((left, right) => {
+      if (left.id === 'unassigned') return 1
+      if (right.id === 'unassigned') return -1
+      return right.quota - left.quota || left.label.localeCompare(right.label)
+    })
+  }, [modelData, t])
 
   const handleChartPreferencesChange = useCallback(
     (preferences: DashboardChartPreferences) => {
@@ -282,19 +306,30 @@ export function Dashboard() {
   )
   const showSectionTabs = visibleSections.length > 1
   const showModelAnalytics = activeSection === 'overview'
+  const splitByVendor = showModelAnalytics && vendorLayout === 'split'
   const modelActions = showModelAnalytics ? (
     <>
+      <Tabs
+        value={vendorLayout}
+        onValueChange={(value) =>
+          setVendorLayout(value === 'split' ? 'split' : 'combined')
+        }
+      >
+        <TabsList aria-label={t('View by vendor')}>
+          <TabsTrigger value='split'>{t('View separately')}</TabsTrigger>
+          <TabsTrigger value='combined'>{t('Combined')}</TabsTrigger>
+        </TabsList>
+      </Tabs>
       <ModelsChartPreferences
         preferences={chartPreferences}
         onPreferencesChange={handleChartPreferencesChange}
       />
-        <ModelsFilter
-          preferences={chartPreferences}
-          currentFilters={modelFilters}
-          modelNames={dataLoading ? undefined : availableModelNames}
-          onFilterChange={handleFilterChange}
-          onReset={handleResetFilters}
-        />
+      <ModelsFilter
+        preferences={chartPreferences}
+        currentFilters={modelFilters}
+        onFilterChange={handleFilterChange}
+        onReset={handleResetFilters}
+      />
     </>
   ) : null
   const flowActions =
@@ -394,43 +429,86 @@ export function Dashboard() {
                 <Suspense fallback={<LogStatCardsFallback />}>
                   <LazyLogStatCards
                     filters={modelFilters}
+                    headless={splitByVendor}
                     onDataUpdate={handleDataUpdate}
                   />
                 </Suspense>
               </FadeIn>
-              {isAdmin && (
+              {isAdmin && !splitByVendor && (
                 <FadeIn delay={0.05}>
                   <Suspense fallback={<PerformanceOverviewFallback />}>
                     <LazyPerformanceOverview />
                   </Suspense>
                 </FadeIn>
               )}
-              <FadeIn delay={0.1}>
-                <Suspense fallback={<ModelChartsFallback />}>
-                  <LazyConsumptionDistributionChart
-                    data={filteredModelData}
-                    loading={dataLoading}
-                    defaultChartType={
-                      chartPreferences.consumptionDistributionChart
-                    }
-                    timeGranularity={
-                      modelFilters.time_granularity || DEFAULT_TIME_GRANULARITY
-                    }
-                  />
-                </Suspense>
-              </FadeIn>
-              <FadeIn delay={0.15}>
-                <Suspense fallback={<ModelChartsFallback />}>
-                  <LazyModelCharts
-                    data={filteredModelData}
-                    loading={dataLoading}
-                    defaultChartTab={chartPreferences.modelAnalyticsChart}
-                    timeGranularity={
-                      modelFilters.time_granularity || DEFAULT_TIME_GRANULARITY
-                    }
-                  />
-                </Suspense>
-              </FadeIn>
+              {splitByVendor && dataLoading ? <LogStatCardsFallback /> : null}
+              {(splitByVendor
+                ? vendorSections
+                : [
+                    {
+                      id: 'all',
+                      label: '',
+                      icon: undefined,
+                      rows: modelData,
+                      quota: 0,
+                    },
+                  ]
+              ).map((section) => (
+                <div key={section.id} className='space-y-3 sm:space-y-4'>
+                  {splitByVendor ? (
+                    <>
+                      <div className='flex items-center gap-2 px-1'>
+                        {section.icon ? (
+                          <span className='flex size-5 shrink-0 items-center justify-center'>
+                            {getLobeIcon(section.icon, 18)}
+                          </span>
+                        ) : null}
+                        <h4 className='text-sm font-semibold'>
+                          {section.label}
+                        </h4>
+                      </div>
+                      <Suspense fallback={<LogStatCardsFallback />}>
+                        <LazyLogStatCards
+                          rows={section.rows}
+                          loading={dataLoading}
+                          filters={modelFilters}
+                        />
+                      </Suspense>
+                    </>
+                  ) : null}
+                  <Suspense fallback={<ModelChartsFallback />}>
+                    <LazyConsumptionDistributionChart
+                      data={section.rows}
+                      loading={dataLoading}
+                      defaultChartType={
+                        chartPreferences.consumptionDistributionChart
+                      }
+                      timeGranularity={
+                        modelFilters.time_granularity ||
+                        DEFAULT_TIME_GRANULARITY
+                      }
+                    />
+                  </Suspense>
+                  <Suspense fallback={<ModelChartsFallback />}>
+                    <LazyModelCharts
+                      data={section.rows}
+                      loading={dataLoading}
+                      defaultChartTab={chartPreferences.modelAnalyticsChart}
+                      timeGranularity={
+                        modelFilters.time_granularity ||
+                        DEFAULT_TIME_GRANULARITY
+                      }
+                    />
+                  </Suspense>
+                </div>
+              ))}
+              {isAdmin && splitByVendor && (
+                <FadeIn delay={0.05}>
+                  <Suspense fallback={<PerformanceOverviewFallback />}>
+                    <LazyPerformanceOverview />
+                  </Suspense>
+                </FadeIn>
+              )}
             </>
           )}
           {activeSection === 'users' && (

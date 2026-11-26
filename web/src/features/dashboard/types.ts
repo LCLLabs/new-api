@@ -191,9 +191,6 @@ export interface DashboardFilters {
   end_timestamp?: Date
   time_granularity?: TimeGranularity
   username?: string
-  // Empty means every model is excluded. Omitted means the model list is not
-  // narrowing the current result.
-  model_names?: string[]
 }
 
 export type ConsumptionDistributionChartType = 'bar' | 'area'
