@@ -89,7 +89,7 @@ describe('bill pages and usage-log links', () => {
       output_tokens: 0,
       actual_quota: 1,
     }
-    expect(billVendorIdentity(row).name).toBe('Claude')
+    expect(billVendorIdentity(row).name).toBe('Anthropic')
     expect(usageLogSearch(row, 10, 20)).toMatchObject({
       model: 'claude',
       token: 'trial',
@@ -125,7 +125,7 @@ describe('bill vendor names', () => {
   it('uses the same model-name match as the usage logs', () => {
     expect(billVendorIdentity(billRow('gpt-4o', 1)).name).toBe('OpenAI')
     expect(billVendorIdentity(billRow('claude-sonnet-4-5', 1)).name).toBe(
-      'Claude'
+      'Anthropic'
     )
     expect(billVendorIdentity(billRow('gemini-2.5-flash', 1)).name).toBe(
       'Gemini'

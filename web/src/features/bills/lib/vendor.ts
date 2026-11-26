@@ -47,9 +47,13 @@ export function billVendorIdentity(row: {
   if (row.adjustment) return { key: 'adjustment', name: '' }
   const provider = resolveModelProvider(row.model_name)
   if (provider) {
+    const name =
+      provider.name === 'Anthropic'
+        ? provider.name
+        : (provider.label ?? provider.name)
     return {
       key: `provider:${provider.name}`,
-      name: provider.label ?? provider.name,
+      name,
       icon: provider.icon,
     }
   }

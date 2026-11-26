@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { Download } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -81,6 +81,7 @@ export function BillsPage(props: { search: BillSearch }) {
 
   const query = useQuery({
     queryKey: ['user-bill', params],
+    placeholderData: keepPreviousData,
     queryFn: async () => {
       const response = requireServerSuccess(await getUserBill(params))
       return response.data
