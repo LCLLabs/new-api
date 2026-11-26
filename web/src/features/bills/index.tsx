@@ -52,7 +52,9 @@ import type { BillDetail, BillMetrics, BillSearch } from './types'
 
 function metricCells(
   metrics: BillMetrics,
-  locale: Intl.LocalesArgument
+  locale: Intl.LocalesArgument,
+  t: (key: string, options?: Record<string, unknown>) => string,
+  showDiscount = true
 ): string[] {
   return [
     String(metrics.request_count),
@@ -63,7 +65,9 @@ function metricCells(
     String(metrics.cache_write_other),
     String(metrics.output_tokens),
     formatBillQuota(metrics.list_quota),
-    formatBillDiscount(metrics.discount, locale),
+    ...(showDiscount
+      ? [formatBillDiscount(metrics.discount, locale, metrics.dynamic, t)]
+      : []),
     formatBillQuota(metrics.actual_quota),
   ]
 }
@@ -128,16 +132,15 @@ export function BillsPage(props: { search: BillSearch }) {
       t('Other cache write'),
       t('Output tokens'),
       t('List price'),
-      t('Discount coefficient'),
       t('Actual charge'),
     ]
     const lines = [
       toCsvLine(header),
-      toCsvLine([t('Total'), ...metricCells(total, locale)]),
+      toCsvLine([t('Total'), ...metricCells(total, locale, t, false)]),
       ...vendors.map((vendor) =>
         toCsvLine([
           vendor.vendor_name || t('Unassigned'),
-          ...metricCells(vendor, locale),
+          ...metricCells(vendor, locale, t, false),
         ])
       ),
     ]
@@ -171,7 +174,7 @@ export function BillsPage(props: { search: BillSearch }) {
           row.adjustment ? t('Adjustment') : row.model_name,
           row.token_name,
           row.group,
-          ...metricCells(row, locale),
+          ...metricCells(row, locale, t),
         ])
       }),
     ]

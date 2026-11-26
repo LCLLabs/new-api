@@ -37,10 +37,14 @@ export function formatBillQuota(value: number | undefined): string {
 
 export function formatBillDiscount(
   value: number | undefined,
-  locale: Intl.LocalesArgument
+  locale: Intl.LocalesArgument,
+  dynamic: boolean | undefined,
+  t: (key: string, options?: Record<string, unknown>) => string
 ): string {
   if (value == null) return '—'
-  return new Intl.NumberFormat(locale, { maximumFractionDigits: 6 }).format(
-    value
-  )
+  const ratio = new Intl.NumberFormat(locale, {
+    maximumFractionDigits: 6,
+  }).format(value)
+  if (dynamic) return t('Dynamic billing × {{ratio}}', { ratio })
+  return ratio
 }

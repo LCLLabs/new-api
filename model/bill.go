@@ -19,8 +19,9 @@ type BillFilter struct {
 	Group     string
 }
 
-// BillMetrics is one statement total. ListQuota and Discount are set only when
-// every included request shares one group discount and is ratio billing.
+// BillMetrics is one statement total. ListQuota is the pre-discount amount.
+// Discount is set only when every included log used the same multiplier.
+// Dynamic is set when that shared multiplier came from tiered expression billing.
 type BillMetrics struct {
 	RequestCount    int      `json:"request_count"`
 	UncachedInput   int64    `json:"uncached_input"`
@@ -32,6 +33,7 @@ type BillMetrics struct {
 	ActualQuota     int64    `json:"actual_quota"`
 	ListQuota       *int64   `json:"list_quota,omitempty"`
 	Discount        *float64 `json:"discount,omitempty"`
+	Dynamic         bool     `json:"dynamic,omitempty"`
 }
 
 // BillVendorTotal is the statement subtotal for one model vendor.
@@ -106,6 +108,7 @@ type billBucket struct {
 	tokenName  string
 	tokenID    int
 	group      string
+	priceKey   string
 	usage      billUsage
 }
 
@@ -119,6 +122,12 @@ type billUsage struct {
 	outputTokens    int64
 	actualQuota     int64
 	ratio           ratioTrack
+	listSum         int64
+	listFailed      bool
+	sawLog          bool
+	dynamic         bool
+	dynamicSet      bool
+	dynamicMixed    bool
 }
 
 type ratioTrack struct {
@@ -135,6 +144,7 @@ type parsedBillOther struct {
 	cacheWriteOther int64
 	ratio           float64
 	ratioOK         bool
+	dynamic         bool
 }
 
 func (track *ratioTrack) observe(value float64, ok bool) {
@@ -175,8 +185,13 @@ func (usage *billUsage) add(source BillSource, parsed parsedBillOther, sign int6
 	usage.cacheWrite1h = addInt64(usage.cacheWrite1h, sign*parsed.cacheWrite1h)
 	usage.cacheWriteOther = addInt64(usage.cacheWriteOther, sign*parsed.cacheWriteOther)
 	usage.outputTokens = addInt64(usage.outputTokens, sign*int64(source.CompletionTokens))
-	usage.actualQuota = addInt64(usage.actualQuota, sign*int64(source.Quota))
-	usage.ratio.observe(parsed.ratio, parsed.ratioOK)
+	signedQuota, quotaOK := signedBillQuota(source.Quota, sign)
+	if quotaOK {
+		usage.actualQuota = addInt64(usage.actualQuota, signedQuota)
+	} else {
+		usage.listFailed = true
+	}
+	usage.observePrice(parsed, signedQuota, quotaOK)
 }
 
 func (usage *billUsage) merge(other billUsage) {
@@ -188,7 +203,12 @@ func (usage *billUsage) merge(other billUsage) {
 	usage.cacheWriteOther = addInt64(usage.cacheWriteOther, other.cacheWriteOther)
 	usage.outputTokens = addInt64(usage.outputTokens, other.outputTokens)
 	usage.actualQuota = addInt64(usage.actualQuota, other.actualQuota)
+	usage.listSum = addInt64(usage.listSum, other.listSum)
+	if other.listFailed {
+		usage.listFailed = true
+	}
 	usage.ratio.merge(other.ratio)
+	usage.mergeDynamic(other)
 }
 
 func (usage billUsage) metrics() BillMetrics {
@@ -202,17 +222,77 @@ func (usage billUsage) metrics() BillMetrics {
 		OutputTokens:    usage.outputTokens,
 		ActualQuota:     usage.actualQuota,
 	}
-	if !usage.ratio.set || usage.ratio.mixed {
+	if !usage.sawLog || usage.listFailed {
 		return metrics
 	}
-	list, ok := listQuotaFromActual(usage.actualQuota, usage.ratio.value)
-	if !ok {
+	if usage.ratio.set && !usage.ratio.mixed {
+		list, ok := listQuotaFromActual(usage.actualQuota, usage.ratio.value)
+		if !ok {
+			return metrics
+		}
+		discount := math.Round(usage.ratio.value*1e6) / 1e6
+		metrics.ListQuota = &list
+		metrics.Discount = &discount
+		metrics.Dynamic = usage.dynamicSet && !usage.dynamicMixed && usage.dynamic
 		return metrics
 	}
-	discount := math.Round(usage.ratio.value*1e6) / 1e6
-	metrics.ListQuota = &list
-	metrics.Discount = &discount
+	metrics.ListQuota = &usage.listSum
 	return metrics
+}
+
+func (usage *billUsage) observePrice(parsed parsedBillOther, signedQuota int64, quotaOK bool) {
+	usage.sawLog = true
+	if !quotaOK || !parsed.ratioOK {
+		usage.listFailed = true
+		usage.dynamicMixed = true
+		usage.ratio.observe(0, false)
+		return
+	}
+	list, ok := listQuotaFromActual(signedQuota, parsed.ratio)
+	if !ok {
+		usage.listFailed = true
+		usage.dynamicMixed = true
+		usage.ratio.observe(0, false)
+		return
+	}
+	usage.listSum = addInt64(usage.listSum, list)
+	usage.ratio.observe(parsed.ratio, true)
+	if !usage.dynamicSet {
+		usage.dynamic = parsed.dynamic
+		usage.dynamicSet = true
+		return
+	}
+	if usage.dynamic != parsed.dynamic {
+		usage.dynamicMixed = true
+	}
+}
+
+func (usage *billUsage) mergeDynamic(other billUsage) {
+	if !other.sawLog {
+		return
+	}
+	if !usage.sawLog {
+		usage.sawLog = true
+		usage.dynamic = other.dynamic
+		usage.dynamicSet = other.dynamicSet
+		usage.dynamicMixed = other.dynamicMixed
+		return
+	}
+	usage.sawLog = true
+	if other.listFailed || other.dynamicMixed || !other.dynamicSet || usage.dynamicMixed || !usage.dynamicSet || usage.dynamic != other.dynamic {
+		usage.dynamicMixed = true
+	}
+}
+
+func signedBillQuota(quota int, sign int64) (int64, bool) {
+	value := int64(quota)
+	if sign >= 0 {
+		return value, true
+	}
+	if value == math.MinInt64 {
+		return 0, false
+	}
+	return -value, true
 }
 
 // listQuotaFromActual reconstructs the pre-discount amount for display.
@@ -285,44 +365,44 @@ func parseBillOther(source BillSource) parsedBillOther {
 	parsed.cacheWrite5m = write5m
 	parsed.cacheWrite1h = write1h
 	parsed.cacheWriteOther = otherWrite
-	parsed.ratio, parsed.ratioOK = billDiscountRatio(fields)
+	parsed.ratio, parsed.dynamic, parsed.ratioOK = billPriceRatio(fields)
 	return parsed
 }
 
-func billDiscountRatio(fields map[string]any) (float64, bool) {
-	if jsonBool(fields["is_task"]) || jsonBool(fields["audio_input_seperate_price"]) {
-		return 0, false
-	}
+// billPriceRatio is the multiplier already applied to the stored quota.
+// Tiered expression billing multiplies group_ratio once. Other billing multiplies
+// group_ratio by user_group_ratio, and the stored -1 sentinel means no special ratio.
+func billPriceRatio(fields map[string]any) (float64, bool, bool) {
+	dynamic := false
 	if mode, _ := fields["billing_mode"].(string); mode == "tiered_expr" {
-		return 0, false
-	}
-	if _, ok := jsonPositive(fields["model_price"]); ok {
-		return 0, false
-	}
-	if surcharges, ok := fields["tool_surcharges"].([]any); ok && len(surcharges) > 0 {
-		return 0, false
+		dynamic = true
 	}
 	groupRatio, ok := jsonPositive(fields["group_ratio"])
 	if !ok {
-		return 0, false
+		return 0, dynamic, false
+	}
+	if dynamic {
+		return groupRatio, true, true
 	}
 	userRatio := 1.0
-	if _, present := fields["user_group_ratio"]; present {
-		userRatio, ok = jsonPositive(fields["user_group_ratio"])
-		if !ok {
-			return 0, false
+	if raw, present := fields["user_group_ratio"]; present {
+		number, numberOK := jsonFloat(raw)
+		if !numberOK || math.IsNaN(number) || math.IsInf(number, 0) {
+			return 0, false, false
+		}
+		if number == -1 {
+			userRatio = 1
+		} else if number > 0 {
+			userRatio = number
+		} else {
+			return 0, false, false
 		}
 	}
 	ratio := groupRatio * userRatio
 	if ratio <= 0 || math.IsNaN(ratio) || math.IsInf(ratio, 0) {
-		return 0, false
+		return 0, false, false
 	}
-	return ratio, true
-}
-
-func jsonBool(value any) bool {
-	flag, ok := value.(bool)
-	return ok && flag
+	return ratio, false, true
 }
 
 func jsonPositive(value any) (float64, bool) {
@@ -396,7 +476,8 @@ func (accumulator *billAccumulator) add(source BillSource, vendors map[string]bi
 	if adjustment {
 		vendor = billVendorRef{}
 	}
-	key := billBucketKey(adjustment, vendor.ID, source)
+	parsed := parseBillOther(source)
+	key := billBucketKey(adjustment, vendor.ID, source, parsed)
 	bucket := accumulator.buckets[key]
 	if bucket == nil {
 		bucket = &billBucket{
@@ -408,13 +489,14 @@ func (accumulator *billAccumulator) add(source BillSource, vendors map[string]bi
 			tokenName:  source.TokenName,
 			tokenID:    source.TokenID,
 			group:      source.Group,
+			priceKey:   billPriceKey(parsed),
 		}
 		accumulator.buckets[key] = bucket
 	}
-	bucket.usage.add(source, parseBillOther(source), sign)
+	bucket.usage.add(source, parsed, sign)
 }
 
-func billBucketKey(adjustment bool, vendorID int, source BillSource) string {
+func billBucketKey(adjustment bool, vendorID int, source BillSource, parsed parsedBillOther) string {
 	if adjustment {
 		return "adjustment"
 	}
@@ -424,7 +506,20 @@ func billBucketKey(adjustment bool, vendorID int, source BillSource) string {
 		strconv.Itoa(source.TokenID),
 		source.TokenName,
 		source.Group,
+		billPriceKey(parsed),
 	}, "\x00")
+}
+
+func billPriceKey(parsed parsedBillOther) string {
+	if !parsed.ratioOK {
+		return "unpriced"
+	}
+	kind := "ratio"
+	if parsed.dynamic {
+		kind = "dynamic"
+	}
+	rounded := math.Round(parsed.ratio*1e6) / 1e6
+	return kind + "\x00" + strconv.FormatFloat(rounded, 'f', -1, 64)
 }
 
 func (accumulator *billAccumulator) finish(filter BillFilter) UserBill {
@@ -446,7 +541,10 @@ func (accumulator *billAccumulator) finish(filter BillFilter) UserBill {
 			}
 			return 1
 		}
-		return strings.Compare(a.modelName+"\x00"+a.tokenName+"\x00"+a.group, b.modelName+"\x00"+b.tokenName+"\x00"+b.group)
+		if cmp := strings.Compare(a.modelName+"\x00"+a.tokenName+"\x00"+a.group, b.modelName+"\x00"+b.tokenName+"\x00"+b.group); cmp != 0 {
+			return cmp
+		}
+		return strings.Compare(a.priceKey, b.priceKey)
 	})
 
 	rows := make([]BillDetail, 0, len(matched))

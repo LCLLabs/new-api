@@ -8,6 +8,7 @@
     "Cannot clear the root redirect URL while root redirect is enabled.": "根路径跳转已启用时，无法清空跳转 URL。",
     "Cannot enable root redirect. Enter a valid absolute HTTP(S) redirect URL first.": "无法启用根路径跳转，请先填写有效的绝对 HTTP(S) 跳转 URL。",
     "Combined": "汇总",
+    "Dynamic billing × {{ratio}}": "动态计费×{{ratio}}",
     "Enter a redirect URL before enabling root path redirect": "启用根路径跳转前请先填写跳转 URL",
     "Enter an absolute HTTP(S) URL without credentials": "请输入不含凭据的绝对 HTTP(S) URL",
     "Redirect root path": "根路径跳转",

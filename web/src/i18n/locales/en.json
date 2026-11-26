@@ -8,6 +8,7 @@
     "Cannot clear the root redirect URL while root redirect is enabled.": "Cannot clear the root redirect URL while root redirect is enabled.",
     "Cannot enable root redirect. Enter a valid absolute HTTP(S) redirect URL first.": "Cannot enable root redirect. Enter a valid absolute HTTP(S) redirect URL first.",
     "Combined": "Combined",
+    "Dynamic billing × {{ratio}}": "Dynamic billing × {{ratio}}",
     "Enter a redirect URL before enabling root path redirect": "Enter a redirect URL before enabling root path redirect",
     "Enter an absolute HTTP(S) URL without credentials": "Enter an absolute HTTP(S) URL without credentials",
     "Redirect root path": "Redirect root path",

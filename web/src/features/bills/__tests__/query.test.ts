@@ -150,4 +150,27 @@ describe('bill vendor names', () => {
       filterBillRows(rows, 'provider:OpenAI').map((row) => row.model_name)
     ).toEqual(['gpt-4o', 'gpt-4o-mini'])
   })
+
+  it('keeps one dynamic rate and still sums list prices when rates differ', () => {
+    const same = billVendorTotals([
+      { ...billRow('gpt-4o', 40), list_quota: 50, discount: 0.8, dynamic: true },
+      {
+        ...billRow('gpt-4o-mini', 40),
+        list_quota: 50,
+        discount: 0.8,
+        dynamic: true,
+      },
+    ])
+    expect(same[0]?.list_quota).toBe(100)
+    expect(same[0]?.discount).toBe(0.8)
+    expect(same[0]?.dynamic).toBe(true)
+
+    const mixed = billVendorTotals([
+      { ...billRow('gpt-4o', 40), list_quota: 50, discount: 0.8, dynamic: true },
+      { ...billRow('gpt-4o-mini', 80), list_quota: 80, discount: 1 },
+    ])
+    expect(mixed[0]?.list_quota).toBe(130)
+    expect(mixed[0]?.discount).toBeUndefined()
+    expect(mixed[0]?.dynamic).toBeUndefined()
+  })
 })

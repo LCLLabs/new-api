@@ -94,12 +94,16 @@ export function sumBillMetrics(rows: BillDetail[]): BillMetrics {
     total.list_quota = rows.reduce((sum, row) => sum + (row.list_quota ?? 0), 0)
   }
   const discount = rows[0]?.discount
+  const dynamic = rows[0]?.dynamic === true
   if (
     rows.length > 0 &&
     discount != null &&
-    rows.every((row) => row.discount === discount)
+    rows.every(
+      (row) => row.discount === discount && (row.dynamic === true) === dynamic
+    )
   ) {
     total.discount = discount
+    total.dynamic = dynamic
   }
   return total
 }
