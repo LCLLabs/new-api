@@ -47,7 +47,9 @@ function FilterSelect(props: {
         items={items}
         value={props.value || ALL}
         onValueChange={(value) => {
-          props.onChange(!value || value === ALL ? '' : String(value))
+          // Opening another select can report a null value. That is not a choice.
+          if (value == null) return
+          props.onChange(value === ALL ? '' : String(value))
         }}
       >
         <SelectTrigger className='w-full'>
