@@ -19,9 +19,23 @@ For commercial licensing, please contact support@quantumnous.com
 import { createSectionRegistry } from '../utils/section-registry'
 import { ChannelHealthSection } from './channel-health-section'
 import type { RequestPolicySettings } from './defaults'
+import { DistillSection } from './distill-section'
 import { RoutingPolicySection } from './routing-section'
 
 const POLICY_SECTIONS = [
+  {
+    id: 'distill',
+    titleKey: 'Distillation checks',
+    build: (settings: RequestPolicySettings) => (
+      <DistillSection
+        defaultValues={{
+          DistillCheckGroups: settings.DistillCheckGroups,
+          DistillRules: settings.DistillRules,
+          DistillSkipOpenAI: settings.DistillSkipOpenAI,
+        }}
+      />
+    ),
+  },
   {
     id: 'routing',
     titleKey: 'Sessions and retries',

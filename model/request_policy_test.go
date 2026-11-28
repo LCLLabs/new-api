@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
@@ -57,7 +58,7 @@ func TestRequestPolicyDatabaseMatrix(t *testing.T) {
 				for k, v := range previousSnapshot.Options {
 					require.NoError(t, updateOptionMap(k, v))
 				}
-				requestPolicySnapshot.Store(previousSnapshot)
+				storeRequestPolicy(previousSnapshot)
 				common.OptionMapRWMutex.Lock()
 				common.OptionMap = previousOptions
 				common.OptionMapRWMutex.Unlock()
@@ -78,6 +79,15 @@ func TestRequestPolicyDatabaseMatrix(t *testing.T) {
 			require.NoError(t, UpdateRequestPolicyOptions(map[string]string{"RetryTimes": "2", "channel_affinity_setting.rules": rules}))
 			assert.Equal(t, 2, CurrentRequestPolicy().RetryTimes)
 			assert.Equal(t, 2, common.RetryTimes, "the runtime global follows the same write")
+			require.NoError(t, UpdateRequestPolicyOptions(map[string]string{"DistillCheckGroups": `["vip"]`, "DistillSkipOpenAI": "false"}))
+			distill := setting.CurrentDistillConfig()
+			assert.True(t, distill.Checks("vip"))
+			assert.False(t, distill.SkipOpenAI(), "one save publishes its distill keys together")
+			assert.Error(t, UpdateRequestPolicyOptions(map[string]string{"DistillCheckGroups": `["default"]`, "DistillRules": `{"patterns":["("]}`}))
+			assert.Same(t, distill, setting.CurrentDistillConfig(), "a rejected save publishes none of its distill keys")
+			LoadOptionsFromDatabase()
+			assert.True(t, setting.CurrentDistillConfig().Checks("vip"), "a reload publishes the stored distill keys")
+			assert.False(t, setting.CurrentDistillConfig().SkipOpenAI())
 			require.NoError(t, UpdateOption("AutomaticRetryStatusCodes", "429,500-503"))
 			assert.Equal(t, "429,500-503", CurrentRequestPolicy().Options["AutomaticRetryStatusCodes"])
 			assert.Equal(t, "429,500-503", operation_setting.AutomaticRetryStatusCodesToString())

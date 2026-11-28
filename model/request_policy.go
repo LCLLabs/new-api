@@ -12,6 +12,7 @@ import (
 
 	"github.com/MoeForge/moego/regexp"
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/config"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"gorm.io/gorm"
@@ -27,6 +28,7 @@ type RequestPolicySnapshot struct {
 	DisableCodes    []operation_setting.StatusCodeRange
 	DisableKeywords []string
 	AutoDisable     bool
+	Distill         *setting.DistillConfig
 	Options         map[string]string
 }
 
@@ -53,6 +55,9 @@ func requestPolicyDefaultOptions() map[string]string {
 	defaults["AutomaticDisableStatusCodes"] = operation_setting.AutomaticDisableStatusCodesToString()
 	defaults["AutomaticDisableKeywords"] = operation_setting.AutomaticDisableKeywordsToString()
 	defaults["AutomaticDisableChannelEnabled"] = strconv.FormatBool(common.AutomaticDisableChannelEnabled)
+	defaults["DistillCheckGroups"] = setting.DistillCheckGroupsJSON()
+	defaults["DistillRules"] = setting.DistillRulesJSON()
+	defaults["DistillSkipOpenAI"] = strconv.FormatBool(setting.DistillSkipOpenAI())
 	defaults["AutomaticEnableChannelEnabled"] = strconv.FormatBool(common.AutomaticEnableChannelEnabled)
 	defaults["ChannelDisableThreshold"] = strconv.FormatFloat(common.ChannelDisableThreshold, 'f', -1, 64)
 	return defaults
@@ -63,7 +68,7 @@ func IsRequestPolicyOption(key string) bool {
 		return true
 	}
 	switch key {
-	case "AutomaticEnableChannelEnabled", "ChannelDisableThreshold", "monitor_setting.auto_test_channel_enabled", "monitor_setting.auto_test_channel_minutes", "monitor_setting.channel_test_concurrency", "monitor_setting.channel_test_mode", "RetryTimes", "AutomaticRetryStatusCodes", "AutomaticDisableChannelEnabled", "AutomaticDisableStatusCodes", "AutomaticDisableKeywords":
+	case "DistillCheckGroups", "DistillRules", "DistillSkipOpenAI", "AutomaticEnableChannelEnabled", "ChannelDisableThreshold", "monitor_setting.auto_test_channel_enabled", "monitor_setting.auto_test_channel_minutes", "monitor_setting.channel_test_concurrency", "monitor_setting.channel_test_mode", "RetryTimes", "AutomaticRetryStatusCodes", "AutomaticDisableChannelEnabled", "AutomaticDisableStatusCodes", "AutomaticDisableKeywords":
 		return true
 	}
 	return false
@@ -142,6 +147,10 @@ func BuildRequestPolicy(options map[string]string) (*RequestPolicySnapshot, erro
 			return nil, fmt.Errorf("invalid boolean: %s", key)
 		}
 	}
+	snapshot.Distill, err = setting.ParseDistillConfig(raw["DistillCheckGroups"], raw["DistillRules"], raw["DistillSkipOpenAI"])
+	if err != nil {
+		return nil, err
+	}
 	if err := operation_setting.ValidateChannelTestConcurrency(raw["monitor_setting.channel_test_concurrency"]); err != nil {
 		return nil, err
 	}
@@ -201,9 +210,17 @@ func refreshRequestPolicySnapshot() error {
 	common.OptionMapRWMutex.RUnlock()
 	snapshot, err := BuildRequestPolicy(options)
 	if err == nil {
-		requestPolicySnapshot.Store(snapshot)
+		storeRequestPolicy(snapshot)
 	}
 	return err
+}
+
+// storeRequestPolicy publishes a validated policy. The distill options are
+// published only here, as one value, so the three keys of one save take
+// effect together.
+func storeRequestPolicy(snapshot *RequestPolicySnapshot) {
+	requestPolicySnapshot.Store(snapshot)
+	setting.PublishDistillConfig(snapshot.Distill)
 }
 
 // UpdateRequestPolicyOptions validates the entire resulting policy before any
@@ -242,6 +259,6 @@ func UpdateRequestPolicyOptions(values map[string]string) error {
 			return err
 		}
 	}
-	requestPolicySnapshot.Store(snapshot)
+	storeRequestPolicy(snapshot)
 	return nil
 }

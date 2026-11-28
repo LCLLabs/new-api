@@ -17,6 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import type { ChannelAffinitySettings } from '../general/channel-affinity/types'
+import type { DistillSettings } from '../types'
+import { factoryDistillRulesJSON } from './distill-defaults'
 
 export type RetrySettings = {
   RetryTimes: number
@@ -38,6 +40,7 @@ export type HealthSettings = {
 }
 export type RequestPolicySettings = RetrySettings &
   HealthSettings &
+  DistillSettings &
   Pick<ChannelAffinitySettings, keyof ChannelAffinitySettings>
 
 export const defaultRequestPolicySettings: RequestPolicySettings = {
@@ -60,4 +63,7 @@ export const defaultRequestPolicySettings: RequestPolicySettings = {
   'channel_affinity_setting.max_entries': 100000,
   'channel_affinity_setting.default_ttl_seconds': 3600,
   'channel_affinity_setting.rules': '[]',
+  DistillCheckGroups: '[]',
+  DistillRules: factoryDistillRulesJSON,
+  DistillSkipOpenAI: true,
 }
