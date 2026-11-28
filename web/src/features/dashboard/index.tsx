@@ -185,7 +185,7 @@ function PerformanceOverviewFallback() {
 
 const SECTION_META: Record<DashboardSectionId, { titleKey: string }> = {
   overview: {
-    titleKey: 'Overview',
+    titleKey: 'Dashboard',
   },
   models: {
     titleKey: 'Model Call Analytics',
@@ -410,7 +410,7 @@ export function Dashboard() {
   return (
     <SectionPageLayout>
       <SectionPageLayout.Title>
-        {showModelAnalytics ? t('Overview') : t(meta.titleKey)}
+        {showModelAnalytics ? t('Dashboard') : t(meta.titleKey)}
       </SectionPageLayout.Title>
       <SectionPageLayout.Content>
         <div className='space-y-3 sm:space-y-4'>

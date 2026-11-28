@@ -75,7 +75,7 @@ export function useSidebarData(badges: SidebarBadges = {}): SidebarData {
         title: t('General'),
         items: [
           {
-            title: t('Overview'),
+            title: t('Dashboard'),
             url: '/dashboard/overview',
             activeUrls: [
               '/dashboard/models',
